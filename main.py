@@ -20,14 +20,13 @@ from tensorboardX import SummaryWriter
 from config import config, device
 from preproc import preproc
 
-writer = SummaryWriter(log_dir=config.event_dir)
+writer = SummaryWriter("/tmp/tnsr")
 """
 Some functions are from the official evaluation script.
 """
 
 
 class SQuADDataset(Dataset):
-
     def __init__(self, npz_file, batch_size):
         data = np.load(npz_file)
         self.context_idxs = data["context_idxs"]
@@ -55,7 +54,6 @@ class SQuADDataset(Dataset):
 
 
 class EMA:
-
     def __init__(self, mu):
         self.mu = mu
         self.shadow = {}
@@ -69,8 +67,7 @@ class EMA:
             if param.requires_grad:
                 assert name in self.shadow
                 decay = min(self.mu, (1 + num_updates) / (10 + num_updates))
-                new_average = (
-                    1.0 - decay) * param.data + decay * self.shadow[name]
+                new_average = (1.0 - decay) * param.data + decay * self.shadow[name]
                 self.shadow[name] = new_average.clone()
 
     def assign(self, model):
@@ -131,8 +128,9 @@ def evaluate(eval_file, answer_dict):
         total += 1
         ground_truths = eval_file[key]["answers"]
         prediction = value
-        exact_match += metric_max_over_ground_truths(exact_match_score,
-                                                     prediction, ground_truths)
+        exact_match += metric_max_over_ground_truths(
+            exact_match_score, prediction, ground_truths
+        )
         f1 += metric_max_over_ground_truths(f1_score, prediction, ground_truths)
     exact_match = 100.0 * exact_match / total
     f1 = 100.0 * f1 / total
@@ -140,7 +138,6 @@ def evaluate(eval_file, answer_dict):
 
 
 def normalize_answer(s):
-
     def remove_articles(text):
         return re.sub(r"\b(a|an|the)\b", " ", text)
 
@@ -183,8 +180,7 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
-def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file,
-          start, ema):
+def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, start, ema):
     model.train()
     losses = []
     print(f"Training epoch {start}")
@@ -213,19 +209,17 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file,
 
         scheduler.step()
         if (i + 1) % config.checkpoint == 0 and (i + 1) < config.checkpoint * (
-                len(dataset) // config.checkpoint):
+            len(dataset) // config.checkpoint
+        ):
             ema.assign(model)
-            metrics = test(model, dev_dataset, dev_eval_file,
-                           i + start * len(dataset))
+            metrics = test(model, dev_dataset, dev_eval_file, i + start * len(dataset))
             ema.resume(model)
             model.train()
         for param_group in optimizer.param_groups:
             # print("Learning:", param_group['lr'])
-            writer.add_scalar("data/lr", param_group["lr"],
-                              i + start * len(dataset))
+            writer.add_scalar("data/lr", param_group["lr"], i + start * len(dataset))
         print(
-            "\rSTEP {:8d}/{} loss {:8f}".format(i + 1, len(dataset),
-                                                loss.item()),
+            "\rSTEP {:8d}/{} loss {:8f}".format(i + 1, len(dataset), loss.item()),
             end="",
         )
     loss_avg = np.mean(losses)
@@ -270,12 +264,12 @@ def test(model, dataset, eval_file, test_i):
             ymin = torch.argmax(a1, dim=1)
             ymax = torch.argmax(a2, dim=1)
 
-            answer_dict_, _ = convert_tokens(eval_file, ids.tolist(),
-                                             ymin.tolist(), ymax.tolist())
+            answer_dict_, _ = convert_tokens(
+                eval_file, ids.tolist(), ymin.tolist(), ymax.tolist()
+            )
             answer_dict.update(answer_dict_)
             print(
-                "\rSTEP {:8d}/{} loss {:8f}".format(i + 1, len(dataset),
-                                                    loss.item()),
+                "\rSTEP {:8d}/{} loss {:8f}".format(i + 1, len(dataset), loss.item()),
                 end="",
             )
             if (i + 1) == num_batches:
@@ -286,8 +280,11 @@ def test(model, dataset, eval_file, test_i):
     json.dump(answer_dict, f)
     f.close()
     metrics["loss"] = loss
-    print("EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(loss, metrics["f1"],
-                                                       metrics["exact_match"]))
+    print(
+        "EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(
+            loss, metrics["f1"], metrics["exact_match"]
+        )
+    )
     if config.mode == "train":
         writer.add_scalar("data/test_loss", loss, test_i)
         writer.add_scalar("data/F1", metrics["f1"], test_i)
@@ -325,16 +322,12 @@ def train_entry(config):
 
     parameters = filter(lambda param: param.requires_grad, model.parameters())
     optimizer = optim.Adam(
-        lr=base_lr,
-        betas=(0.9, 0.999),
-        eps=1e-7,
-        weight_decay=5e-8,
-        params=parameters)
+        lr=base_lr, betas=(0.9, 0.999), eps=1e-7, weight_decay=5e-8, params=parameters
+    )
     cr = lr / math.log2(lr_warm_up_num)
     scheduler = optim.lr_scheduler.LambdaLR(
         optimizer,
-        lr_lambda=
-        lambda ee: cr * math.log2(ee + 1) if ee < lr_warm_up_num else lr,
+        lr_lambda=lambda ee: cr * math.log2(ee + 1) if ee < lr_warm_up_num else lr,
     )
     best_f1 = 0
     best_em = 0
@@ -352,8 +345,9 @@ def train_entry(config):
             ema,
         )
         ema.assign(model)
-        metrics = test(model, dev_dataset, dev_eval_file,
-                       (iter + 1) * len(train_dataset))
+        metrics = test(
+            model, dev_dataset, dev_eval_file, (iter + 1) * len(train_dataset)
+        )
         dev_f1 = metrics["f1"]
         dev_em = metrics["exact_match"]
         if dev_f1 < best_f1 and dev_em < best_em:

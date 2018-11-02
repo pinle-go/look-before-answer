@@ -6,6 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 import spacy
+
 """
 The content of this file is mostly copied from https://github.com/HKUST-KnowComp/R-Net/blob/master/prepro.py
 """
@@ -31,7 +32,7 @@ def convert_idx(text, tokens):
     return spans
 
 
-def process_file(filename, data_type, word_counter, char_counter):
+def process_file(filename, data_type, word_counter, char_counter, version="V2"):
     print("Generating {} examples...".format(data_type))
     examples = []
     eval_examples = {}
@@ -40,8 +41,7 @@ def process_file(filename, data_type, word_counter, char_counter):
         source = json.load(fh)
         for article in tqdm(source["data"]):
             for para in article["paragraphs"]:
-                context = para["context"].replace("''", '" ').replace(
-                    "``", '" ')
+                context = para["context"].replace("''", '" ').replace("``", '" ')
                 context_tokens = word_tokenize(context)
                 context_chars = [list(token) for token in context_tokens]
                 spans = convert_idx(context, context_tokens)
@@ -51,45 +51,108 @@ def process_file(filename, data_type, word_counter, char_counter):
                         char_counter[char] += len(para["qas"])
                 for qa in para["qas"]:
                     total += 1
-                    ques = qa["question"].replace("''", '" ').replace(
-                        "``", '" ')
+                    ques = qa["question"].replace("''", '" ').replace("``", '" ')
                     ques_tokens = word_tokenize(ques)
                     ques_chars = [list(token) for token in ques_tokens]
                     for token in ques_tokens:
                         word_counter[token] += 1
                         for char in token:
                             char_counter[char] += 1
-                    y1s, y2s = [], []
-                    answer_texts = []
-                    for answer in qa["answers"]:
-                        answer_text = answer["text"]
-                        answer_start = answer["answer_start"]
-                        answer_end = answer_start + len(answer_text)
-                        answer_texts.append(answer_text)
-                        answer_span = []
-                        for idx, span in enumerate(spans):
-                            if not (answer_end <= span[0] or
-                                    answer_start >= span[1]):
-                                answer_span.append(idx)
-                        y1, y2 = answer_span[0], answer_span[-1]
-                        y1s.append(y1)
-                        y2s.append(y2)
-                    example = {
-                        "context_tokens": context_tokens,
-                        "context_chars": context_chars,
-                        "ques_tokens": ques_tokens,
-                        "ques_chars": ques_chars,
-                        "y1s": y1s,
-                        "y2s": y2s,
-                        "id": total,
-                    }
-                    examples.append(example)
-                    eval_examples[str(total)] = {
-                        "context": context,
-                        "spans": spans,
-                        "answers": answer_texts,
-                        "uuid": qa["id"],
-                    }
+                    if version == "V2":
+                        y1s, y2s = [], []
+                        answer_texts = []
+                        plausible_y1s, plausible_y2s = [], []
+                        plausible_answer_texts = []
+                        is_impossible = bool(qa["is_impossible"])
+
+                        if is_impossible:
+                            for answer in qa["plausible_answers"]:
+                                answer_text = answer["text"]
+                                answer_start = answer["answer_start"]
+                                answer_end = answer_start + len(answer_text)
+                                plausible_answer_texts.append(answer_text)
+                                answer_span = []
+                                for idx, span in enumerate(spans):
+                                    if not (
+                                        answer_end <= span[0] or answer_start >= span[1]
+                                    ):
+                                        answer_span.append(idx)
+                                y1, y2 = answer_span[0], answer_span[-1]
+                                plausible_y1s.append(y1)
+                                plausible_y2s.append(y2)
+                        else:
+                            for answer in qa["answers"]:
+                                answer_text = answer["text"]
+                                answer_start = answer["answer_start"]
+                                answer_end = answer_start + len(answer_text)
+                                answer_texts.append(answer_text)
+                                answer_span = []
+                                for idx, span in enumerate(spans):
+                                    if not (
+                                        answer_end <= span[0] or answer_start >= span[1]
+                                    ):
+                                        answer_span.append(idx)
+                                y1, y2 = answer_span[0], answer_span[-1]
+                                y1s.append(y1)
+                                y2s.append(y2)
+
+                        example = {
+                            "context_tokens": context_tokens,
+                            "context_chars": context_chars,
+                            "ques_tokens": ques_tokens,
+                            "ques_chars": ques_chars,
+                            "y1s": y1s,
+                            "y2s": y2s,
+                            "plausible_y1s": plausible_y1s,
+                            "plausible_y2s": plausible_y2s,
+                            "id": total,
+                            "is_impossible": is_impossible,
+                        }
+                        examples.append(example)
+
+                        eval_examples[str(total)] = {
+                            "context": context,
+                            "spans": spans,
+                            "answers": answer_texts,
+                            "plausible_answers": plausible_answer_texts,
+                            "uuid": qa["id"],
+                            "is_impossible": is_impossible,
+                        }
+                    else:  # v1.1 case
+                        y1s, y2s = [], []
+                        answer_texts = []
+
+                        for answer in qa["answers"]:
+                            answer_text = answer["text"]
+                            answer_start = answer["answer_start"]
+                            answer_end = answer_start + len(answer_text)
+                            answer_texts.append(answer_text)
+                            answer_span = []
+                            for idx, span in enumerate(spans):
+                                if not (
+                                    answer_end <= span[0] or answer_start >= span[1]
+                                ):
+                                    answer_span.append(idx)
+                            y1, y2 = answer_span[0], answer_span[-1]
+                            y1s.append(y1)
+                            y2s.append(y2)
+                        example = {
+                            "context_tokens": context_tokens,
+                            "context_chars": context_chars,
+                            "ques_tokens": ques_tokens,
+                            "ques_chars": ques_chars,
+                            "y1s": y1s,
+                            "y2s": y2s,
+                            "id": total,
+                        }
+                        examples.append(example)
+
+                        eval_examples[str(total)] = {
+                            "context": context,
+                            "spans": spans,
+                            "answers": answer_texts,
+                            "uuid": qa["id"],
+                        }
         print("{} questions in total".format(len(examples)))
     return examples, eval_examples
 
@@ -107,29 +170,31 @@ def get_embedding(counter, data_type, limit=-1, emb_file=None, vec_size=None):
                 vector = list(map(float, array[-vec_size:]))
                 if word in counter and counter[word] > limit:
                     embedding_dict[word] = vector
-        print("{} / {} tokens have corresponding {} embedding vector".format(
-            len(embedding_dict), len(filtered_elements), data_type))
+        print(
+            "{} / {} tokens have corresponding {} embedding vector".format(
+                len(embedding_dict), len(filtered_elements), data_type
+            )
+        )
     else:
         assert vec_size is not None
         for token in filtered_elements:
             embedding_dict[token] = [
                 np.random.normal(scale=0.1) for _ in range(vec_size)
             ]
-        print("{} tokens have corresponding embedding vector".format(
-            len(filtered_elements)))
+        print(
+            "{} tokens have corresponding embedding vector".format(
+                len(filtered_elements)
+            )
+        )
 
     NULL = "--NULL--"
     OOV = "--OOV--"
-    token2idx_dict = {
-        token: idx for idx, token in enumerate(embedding_dict.keys(), 2)
-    }
+    token2idx_dict = {token: idx for idx, token in enumerate(embedding_dict.keys(), 2)}
     token2idx_dict[NULL] = 0
     token2idx_dict[OOV] = 1
     embedding_dict[NULL] = [0.0 for _ in range(vec_size)]
     embedding_dict[OOV] = [0.0 for _ in range(vec_size)]
-    idx2emb_dict = {
-        idx: embedding_dict[token] for token, idx in token2idx_dict.items()
-    }
+    idx2emb_dict = {idx: embedding_dict[token] for token, idx in token2idx_dict.items()}
     emb_mat = [idx2emb_dict[idx] for idx in range(len(idx2emb_dict))]
     return emb_mat, token2idx_dict
 
@@ -141,9 +206,7 @@ def convert_to_features(config, data, word2idx_dict, char2idx_dict):
     question = question.replace("''", '" ').replace("``", '" ')
     example["context_tokens"] = word_tokenize(context)
     example["ques_tokens"] = word_tokenize(question)
-    example["context_chars"] = [
-        list(token) for token in example["context_tokens"]
-    ]
+    example["context_chars"] = [list(token) for token in example["context_tokens"]]
     example["ques_chars"] = [list(token) for token in example["ques_tokens"]]
 
     para_limit = config.para_limit
@@ -152,8 +215,10 @@ def convert_to_features(config, data, word2idx_dict, char2idx_dict):
     char_limit = config.char_limit
 
     def filter_func(example):
-        return (len(example["context_tokens"]) > para_limit or
-                len(example["ques_tokens"]) > ques_limit)
+        return (
+            len(example["context_tokens"]) > para_limit
+            or len(example["ques_tokens"]) > ques_limit
+        )
 
     if filter_func(example):
         raise ValueError("Context/Questions lengths are over the limit")
@@ -197,22 +262,34 @@ def convert_to_features(config, data, word2idx_dict, char2idx_dict):
     return context_idxs, context_char_idxs, ques_idxs, ques_char_idxs
 
 
-def build_features(config,
-                   examples,
-                   data_type,
-                   out_file,
-                   word2idx_dict,
-                   char2idx_dict,
-                   is_test=False):
+def build_features(
+    config, examples, data_type, out_file, word2idx_dict, char2idx_dict, is_test=False
+):
     para_limit = config.para_limit
     ques_limit = config.ques_limit
     ans_limit = config.ans_limit
     char_limit = config.char_limit
 
     def filter_func(example, is_test=False):
-        return (len(example["context_tokens"]) > para_limit or
-                len(example["ques_tokens"]) > ques_limit or
-                (example["y2s"][0] - example["y1s"][0]) > ans_limit)
+        if config.data_version == "V2":
+            try:
+                if example["is_impossible"]:
+                    return (
+                        len(example["context_tokens"]) > para_limit
+                        or len(example["ques_tokens"]) > ques_limit
+                    )
+            except Exception as e:
+                print(example)
+                print(e)
+                import ipdb
+
+                ipdb.trace()
+
+        return (
+            len(example["context_tokens"]) > para_limit
+            or len(example["ques_tokens"]) > ques_limit
+            or (example["y2s"][-1] - example["y1s"][-1]) > ans_limit
+        )
 
     print("Processing {} examples...".format(data_type))
     total = 0
@@ -226,6 +303,8 @@ def build_features(config,
     y1s = []
     y2s = []
     ids = []
+    if config.data_version == "V2":
+        impossibles = []
     for n, example in tqdm(enumerate(examples)):
         total_ += 1
 
@@ -272,21 +351,41 @@ def build_features(config,
                 ques_char_idx[i, j] = _get_char(char)
         ques_char_idxs.append(ques_char_idx)
 
-        start, end = example["y1s"][-1], example["y2s"][-1]
-        y1s.append(start)
-        y2s.append(end)
-        ids.append(example["id"])
+        if config.data_version == "V2":
+            if not example["is_impossible"]:
+                start, end = example["y1s"][-1], example["y2s"][-1]
+            else:
+                start, end = -1, -1
+            y1s.append(start)
+            y2s.append(end)
+            ids.append(example["id"])
+            impossibles.append(example["is_impossible"])
+        else:
+            start, end = example["y1s"][-1], example["y2s"][-1]
 
-    np.savez(
-        out_file,
-        context_idxs=np.array(context_idxs),
-        context_char_idxs=np.array(context_char_idxs),
-        ques_idxs=np.array(ques_idxs),
-        ques_char_idxs=np.array(ques_char_idxs),
-        y1s=np.array(y1s),
-        y2s=np.array(y2s),
-        ids=np.array(ids),
-    )
+    if config.data_version == "V2":
+        np.savez(
+            out_file,
+            context_idxs=np.array(context_idxs),
+            context_char_idxs=np.array(context_char_idxs),
+            ques_idxs=np.array(ques_idxs),
+            ques_char_idxs=np.array(ques_char_idxs),
+            y1s=np.array(y1s),
+            y2s=np.array(y2s),
+            ids=np.array(ids),
+            impossibles=np.array(impossibles),
+        )
+    else:
+        np.savez(
+            out_file,
+            context_idxs=np.array(context_idxs),
+            context_char_idxs=np.array(context_char_idxs),
+            ques_idxs=np.array(ques_idxs),
+            ques_char_idxs=np.array(ques_char_idxs),
+            y1s=np.array(y1s),
+            y2s=np.array(y2s),
+            ids=np.array(ids),
+        )
     print("Built {} / {} instances of features in total".format(total, total_))
     meta["total"] = total
     return meta
@@ -301,10 +400,12 @@ def save(filename, obj, message=None):
 
 def preproc(config):
     word_counter, char_counter = Counter(), Counter()
-    train_examples, train_eval = process_file(config.train_file, "train",
-                                              word_counter, char_counter)
-    dev_examples, dev_eval = process_file(config.dev_file, "dev", word_counter,
-                                          char_counter)
+    train_examples, train_eval = process_file(
+        config.train_file, "train", word_counter, char_counter, config.data_version
+    )
+    dev_examples, dev_eval = process_file(
+        config.dev_file, "dev", word_counter, char_counter, config.data_version
+    )
     # test_examples, test_eval = process_file(config.test_file, "test", word_counter, char_counter)
 
     word_emb_file = config.fasttext_file if config.fasttext else config.glove_word_file
@@ -313,9 +414,11 @@ def preproc(config):
     char_emb_dim = config.glove_dim if config.pretrained_char else config.char_dim
 
     word_emb_mat, word2idx_dict = get_embedding(
-        word_counter, "word", emb_file=word_emb_file, vec_size=config.glove_dim)
+        word_counter, "word", emb_file=word_emb_file, vec_size=config.glove_dim
+    )
     char_emb_mat, char2idx_dict = get_embedding(
-        char_counter, "char", emb_file=char_emb_file, vec_size=char_emb_dim)
+        char_counter, "char", emb_file=char_emb_file, vec_size=char_emb_dim
+    )
 
     build_features(
         config,
