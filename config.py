@@ -4,6 +4,7 @@ import torch
 import torch.backends.cudnn as cudnn
 
 import absl.flags as flags
+
 """
 The content of this file is mostly copied from https://github.com/HKUST-KnowComp/R-Net/blob/master/config.py
 """
@@ -11,18 +12,18 @@ The content of this file is mostly copied from https://github.com/HKUST-KnowComp
 home = os.path.expanduser("~")
 
 data_version = "V2"
-if (data_version=="V2"):
+if data_version == "V2":
     train_file = os.path.join(home, "data", "squad", "train-v2.0.json")
     dev_file = os.path.join(home, "data", "squad", "dev-v2.0.json")
     test_file = os.path.join(home, "data", "squad", "dev-v2.O.json")
-else:    
+else:
     train_file = os.path.join(home, "data", "squad", "train-v1.1.json")
     dev_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
     test_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
-    
+
 glove_word_file = os.path.join(home, "data", "glove", "glove.840B.300d.txt")
 data_version = "V2"
-target_dir = "data"+"_"+data_version
+target_dir = "data" + "_" + data_version
 event_dir = "log"
 save_dir = "model"
 answer_dir = "log"
@@ -95,34 +96,29 @@ flags.DEFINE_list("bucket_range", [40, 401, 40], "the range of bucket")
 flags.DEFINE_integer("batch_size", 32, "Batch size")
 # flags.DEFINE_integer("num_steps", 0, "Number of steps")
 flags.DEFINE_integer("num_epoch", 40, "Number of epoch")
-flags.DEFINE_integer("checkpoint", 900,
-                     "checkpoint to save and evaluate the model")
+flags.DEFINE_integer("checkpoint", 900, "checkpoint to save and evaluate the model")
 flags.DEFINE_integer("period", 100, "period to save batch loss")
-flags.DEFINE_integer("val_num_batches", 500,
-                     "Number of batches to evaluate the model")
+flags.DEFINE_integer("val_num_batches", 500, "Number of batches to evaluate the model")
 flags.DEFINE_float("dropout", 0.1, "Dropout prob across the layers")
 flags.DEFINE_float("dropout_char", 0.05, "Dropout prob across the layers")
 flags.DEFINE_float("grad_clip", 10.0, "Global Norm gradient clipping rate")
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate")
-flags.DEFINE_integer("lr_warm_up_num", 1000,
-                     "Number of warm-up steps of learning rate")
+flags.DEFINE_integer("lr_warm_up_num", 1000, "Number of warm-up steps of learning rate")
 flags.DEFINE_float("decay", 0.9999, "Exponential moving average decay")
 # flags.DEFINE_float("l2_norm", 3e-7, "L2 norm scale")
 flags.DEFINE_integer("early_stop", 50, "Checkpoints for early stop")
-flags.DEFINE_integer("connector_dim", 96,
-                     "Dimension of connectors of each layer")
+flags.DEFINE_integer("connector_dim", 96, "Dimension of connectors of each layer")
 flags.DEFINE_integer("num_heads", 1, "Number of heads in multi-head attention")
 
 flags.DEFINE_string("train_log", "log/train.log", "Log for each checkpoint")
 flags.DEFINE_boolean("print_weight", False, "Print weights of some layers")
 
 # Extensions (Uncomment corresponding line in download.sh to download the required data)
-glove_char_file = os.path.join(home, "data", "glove",
-                               "glove.840B.300d-char.txt")
-flags.DEFINE_string("glove_char_file", glove_char_file,
-                    "Glove character embedding")
-flags.DEFINE_boolean("pretrained_char", False,
-                     "Whether to use pretrained char embedding")
+glove_char_file = os.path.join(home, "data", "glove", "glove.840B.300d-char.txt")
+flags.DEFINE_string("glove_char_file", glove_char_file, "Glove character embedding")
+flags.DEFINE_boolean(
+    "pretrained_char", False, "Whether to use pretrained char embedding"
+)
 
 fasttext_file = os.path.join(home, "data", "fasttext", "wiki-news-300d-1M.vec")
 flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding")
