@@ -272,12 +272,18 @@ def build_features(config,
 
     def filter_func(example, is_test=False):
         if (config.data_version=="V2"):
-            if (example["is_impossible"]):
-                return (
-                    len(example["context_tokens"]) > para_limit or
-                    len(example["ques_tokens"]) > ques_limit or
-                    (example["plausible_y2s"][-1] - example["plausible_y1s"][-1]) > ans_limit
-                )
+            try:
+                if (example["is_impossible"]):
+                    return (
+                        len(example["context_tokens"]) > para_limit or
+                        len(example["ques_tokens"]) > ques_limit
+                    )
+            except Exception as e :
+                print(example)
+                print(e)
+                import ipdb
+                ipdb.trace()
+   
         return (
             len(example["context_tokens"]) > para_limit or
             len(example["ques_tokens"]) > ques_limit or
@@ -394,7 +400,7 @@ def save(filename, obj, message=None):
 def preproc(config):
     word_counter, char_counter = Counter(), Counter()
     train_examples, train_eval = process_file(config.train_file, "train",
-                                              word_counter, char_counter)
+                            word_counter, char_counter, config.data_version)
     dev_examples, dev_eval = process_file(config.dev_file, "dev", word_counter,
                                           char_counter, config.data_version)
     # test_examples, test_eval = process_file(config.test_file, "test", word_counter, char_counter)
