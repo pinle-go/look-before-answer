@@ -10,11 +10,19 @@ The content of this file is mostly copied from https://github.com/HKUST-KnowComp
 
 home = os.path.expanduser("~")
 
-train_file = os.path.join(home, "data", "squad", "train-v1.1.json")
-dev_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
-test_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
+data_version = "V2"
+if (data_version=="V2"):
+    train_file = os.path.join(home, "data", "squad", "train-v2.0.json")
+    dev_file = os.path.join(home, "data", "squad", "dev-v2.0.json")
+    test_file = os.path.join(home, "data", "squad", "dev-v2.O.json")
+else:    
+    train_file = os.path.join(home, "data", "squad", "train-v1.1.json")
+    dev_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
+    test_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
+    
 glove_word_file = os.path.join(home, "data", "glove", "glove.840B.300d.txt")
-target_dir = "data"
+data_version = "V2"
+target_dir = "data"+"_"+data_version
 event_dir = "log"
 save_dir = "model"
 answer_dir = "log"
@@ -119,6 +127,10 @@ flags.DEFINE_boolean("pretrained_char", False,
 fasttext_file = os.path.join(home, "data", "fasttext", "wiki-news-300d-1M.vec")
 flags.DEFINE_string("fasttext_file", fasttext_file, "Fasttext word embedding")
 flags.DEFINE_boolean("fasttext", False, "Whether to use fasttext")
+# new flags
+flags.DEFINE_string("model_type", "model1", "which model type to use")
+flags.DEFINE_string("data_version", data_version, "which squad version to load")
+
 
 config = flags.FLAGS
 

@@ -19,8 +19,7 @@ from tensorboardX import SummaryWriter
 
 from config import config, device
 from preproc import preproc
-
-writer = SummaryWriter(log_dir=config.event_dir)
+writer = SummaryWriter('/tmp/tnsr')
 """
 Some functions are from the official evaluation script.
 """
