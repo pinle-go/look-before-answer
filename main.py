@@ -18,7 +18,7 @@ from tqdm import tqdm
 from config import config, device
 from model_utils import get_loss_func, get_model_func, get_pred_func
 from preproc import preproc
-from utils import EMA, convert_tokens, get_loader
+from utils import EMA, convert_tokens, get_loader, evaluate
 
 writer = SummaryWriter("/tmp/tnsr")
 """
@@ -146,6 +146,8 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
                 impossibles = impossibles.to(device)
                 if config.model_type == "model0":
                     ymin, ymax = [], []
+                    p1 = F.softmax(p1, dim=1)
+                    p2 = F.softmax(p2, dim=1)
                     for p1_, p2_, z_, y1_, y2_, impossibles_ in zip(
                         p1, p2, z, y1, y2, impossibles
                     ):
@@ -188,7 +190,6 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
                 outer = torch.matmul(p1.unsqueeze(2), p2.unsqueeze(1))
                 for j in range(outer.size()[0]):
                     outer[j] = torch.triu(outer[j])
-                    # outer[j] = torch.tril(outer[j], config.ans_limit)
                 a1, _ = torch.max(outer, dim=2)
                 a2, _ = torch.max(outer, dim=1)
                 ymin = torch.argmax(a1, dim=1)
@@ -216,11 +217,21 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
     json.dump(answer_dict, f)
     f.close()
     metrics["loss"] = loss
-    print(
-        "EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(
-            loss, metrics["f1"], metrics["exact_match"]
+    if config.data_version == "V2":
+        print(
+            "EVAL loss {:8f} F1 {:8f} EM {:8f} answer possible {:8f}\n".format(
+                loss,
+                metrics["f1"],
+                metrics["exact_match"],
+                metrics["answerability_acc"],
+            )
         )
-    )
+    else:
+        print(
+            "EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(
+                loss, metrics["f1"], metrics["exact_match"]
+            )
+        )
     if config.mode == "train":
         writer.add_scalar("data/test_loss", loss, test_i)
         writer.add_scalar("data/F1", metrics["f1"], test_i)
@@ -308,6 +319,7 @@ def test_entry(config):
     with open(config.dev_eval_file, "r") as fh:
         dev_eval_file = json.load(fh)
     dev_dataset = get_loader(config.dev_record_file, config.batch_size)
+    print(len(dev_dataset))
     fn = os.path.join(config.save_dir, "model.pt")
     model = torch.load(fn)
     test(model, dev_dataset, dev_eval_file, 0, get_loss_func(), get_pred_func())
