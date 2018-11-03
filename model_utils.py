@@ -76,6 +76,24 @@ def pred_model0(p1, p2, z):
     ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
     return ymin, ymax
 
+def pred_model1(p1, p2, z):
+    ymin, ymax = [], []
+    for p1_, p2_, z_ in zip(p1, p2, z):
+        outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
+        outer = torch.triu(outer)
+        if outer.max() > z_:
+            a1, _ = torch.max(outer, dim=1)
+            a2, _ = torch.max(outer, dim=0)
+            ymin_ = torch.argmax(a1, dim=0)
+            ymax_ = torch.argmax(a2, dim=0)
+        else:
+            ymin_ = -1
+            ymax_ = -1
+        ymin.append(ymin_)
+        ymax.append(ymax_)
+    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
+    return ymin, ymax
+
 
 def get_loss_func():
     if config.data_version == "V2":
@@ -98,7 +116,7 @@ def get_pred_func():
         if config.model_type == "model0":
             return pred_model0
         elif config.model_type == "model1":
-            return pred_origin
+            return pred_model1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
