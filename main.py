@@ -18,7 +18,7 @@ from tqdm import tqdm
 from config import config, device
 from model_utils import get_loss_func, get_model_func, get_pred_func
 from preproc import preproc
-from utils import EMA, convert_tokens, get_loader
+from utils import EMA, convert_tokens, get_loader, evaluate
 
 writer = SummaryWriter("/tmp/tnsr")
 """
@@ -152,11 +152,21 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
     json.dump(answer_dict, f)
     f.close()
     metrics["loss"] = loss
-    print(
-        "EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(
-            loss, metrics["f1"], metrics["exact_match"]
+    if config.data_version == "V2":
+        print(
+            "EVAL loss {:8f} F1 {:8f} EM {:8f} answer possible {:8f}\n".format(
+                loss,
+                metrics["f1"],
+                metrics["exact_match"],
+                metrics["answerability_acc"],
+            )
         )
-    )
+    else:
+        print(
+            "EVAL loss {:8f} F1 {:8f} EM {:8f}\n".format(
+                loss, metrics["f1"], metrics["exact_match"]
+            )
+        )
     if config.mode == "train":
         writer.add_scalar("data/test_loss", loss, test_i)
         writer.add_scalar("data/F1", metrics["f1"], test_i)
