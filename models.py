@@ -399,3 +399,58 @@ class QANetV0(QANet):
         batch_size = p1.size(0)
         fake_z = torch.rand(batch_size, device=p1.device)
         return p1, p2, fake_z
+
+
+class PointerV1(Pointer):
+    def forward(self, M1, M2, M3, mask):
+        size = list(M1.size())
+        size[2] = 1
+
+        M1_pad = torch.ones(size, device=M1.device)
+        M2_pad = torch.ones(size, device=M2.device)
+        M3_pad = torch.ones(size, device=M3.device)
+        mask_pad = torch.ones((mask.size(0), 1), device=mask.device)
+
+        M1 = torch.cat([M1, M1_pad], dim=2)
+        M2 = torch.cat([M2, M2_pad], dim=2)
+        M3 = torch.cat([M3, M3_pad], dim=2)
+        mask = torch.cat([mask, mask_pad], dim=1)
+
+        return super().forward(M1, M2, M3, mask)
+
+
+class QANetV1(QANet):
+    def __init__(self, word_mat, char_mat):
+        super().__init__(word_mat, char_mat)
+
+        self.out = PointerV1()
+
+    def forward(self, Cwid, Ccid, Qwid, Qcid):
+        # import ipdb; ipdb.set_trace()
+        maskC = (torch.zeros_like(Cwid) != Cwid).float()
+        maskQ = (torch.zeros_like(Qwid) != Qwid).float()
+        Cw, Cc = self.word_emb(Cwid), self.char_emb(Ccid)
+        Qw, Qc = self.word_emb(Qwid), self.char_emb(Qcid)
+        C, Q = self.emb(Cc, Cw, Lc), self.emb(Qc, Qw, Lq)
+        Ce = self.emb_enc(C, maskC, 1, 1)
+        Qe = self.emb_enc(Q, maskQ, 1, 1)
+        X = self.cq_att(Ce, Qe, maskC, maskQ)
+        M0 = self.cq_resizer(X)
+        M0 = F.dropout(M0, p=dropout, training=self.training)
+        for i, blk in enumerate(self.model_enc_blks):
+            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
+        M1 = M0
+        for i, blk in enumerate(self.model_enc_blks):
+            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
+        M2 = M0
+        M0 = F.dropout(M0, p=dropout, training=self.training)
+        for i, blk in enumerate(self.model_enc_blks):
+            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
+        M3 = M0
+        p1, p2 = self.out(M1, M2, M3, maskC)
+        p1 = F.softmax(p1, dim=1)
+        p2 = F.softmax(p2, dim=1)
+
+        z = p1[:, -1] * p2[:, -1]
+        p1, p2 = p1[:, :-1], p2[:, :-1]
+        return p1, p2, z

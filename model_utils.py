@@ -26,6 +26,25 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
     return loss
 
 
+def loss_model1(p1, p2, y1, y2, z, impossibles):
+    # compute loss when possible
+    if len(p1[impossibles == 0]) > 0:
+        p1_ = torch.log(p1[impossibles == 0])
+        p2_ = torch.log(p2[impossibles == 0])
+        loss1 = F.nll_loss(p1_, y1[impossibles == 0])
+        loss2 = F.nll_loss(p2_, y2[impossibles == 0])
+        loss = loss1 + loss2
+    else:
+        loss = 0
+
+    # compute loss when impossible
+    if len(p1[impossibles != 0]) > 0:
+        # TODO: something might be wrong here
+        loss += -torch.log(z).mean()
+
+    return loss
+
+
 def pred_origin(p1, p2, z):
     p1 = F.softmax(p1, dim=1)
     p2 = F.softmax(p2, dim=1)
@@ -63,7 +82,7 @@ def get_loss_func():
         if config.model_type == "model0":
             return loss_model0
         elif config.model_type == "model1":
-            return loss_origin
+            return loss_model1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
@@ -91,13 +110,13 @@ def get_pred_func():
 
 
 def get_model_func():
-    from models import QANet, QANetV0
+    from models import QANet, QANetV0, QANetV1
 
     if config.data_version == "V2":
         if config.model_type == "model0":
             return QANetV0
         elif config.model_type == "model1":
-            raise NotImplementedError()
+            return QANetV1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
