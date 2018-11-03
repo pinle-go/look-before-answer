@@ -228,7 +228,17 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
-def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, start, ema, loss_func):
+def train(
+    model,
+    optimizer,
+    scheduler,
+    dataset,
+    dev_dataset,
+    dev_eval_file,
+    start,
+    ema,
+    loss_func,
+):
     model.train()
     losses = []
     print(f"Training epoch {start}")
@@ -269,7 +279,14 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, star
             len(dataset) // config.checkpoint
         ):
             ema.assign(model)
-            metrics = test(model, dev_dataset, dev_eval_file, i + start * len(dataset))
+            metrics = test(
+                model,
+                dev_dataset,
+                dev_eval_file,
+                i + start * len(dataset),
+                get_loss_func(),
+                get_pred_func(),
+            )
             ema.resume(model)
             model.train()
         for param_group in optimizer.param_groups:
@@ -329,7 +346,7 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
             )
             if (i + 1) == num_batches:
                 break
-    
+
     loss = np.mean(losses)
     metrics = evaluate(eval_file, answer_dict)
     f = open("log/answers.json", "w")
@@ -402,11 +419,16 @@ def train_entry(config):
             dev_eval_file,
             iter,
             ema,
-            get_loss_func()
+            get_loss_func(),
         )
         ema.assign(model)
         metrics = test(
-            model, dev_dataset, dev_eval_file, (iter + 1) * len(train_dataset), get_loss_func(), get_pred_func()
+            model,
+            dev_dataset,
+            dev_eval_file,
+            (iter + 1) * len(train_dataset),
+            get_loss_func(),
+            get_pred_func(),
         )
         dev_f1 = metrics["f1"]
         dev_em = metrics["exact_match"]
@@ -440,7 +462,7 @@ def main(_):
         preproc(config)
     elif config.mode == "debug":
         config.batch_size = 2
-        config.num_steps = 32
+        # config.num_steps = 32
         config.val_num_batches = 2
         config.checkpoint = 2
         config.period = 1
