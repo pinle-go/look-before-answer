@@ -139,9 +139,6 @@ def get_loader(npz_file, batch_size):
 
 
 def convert_tokens(eval_file, qa_id, pp1, pp2, zz=None):
-    import ipdb
-
-    ipdb.set_trace()
     answer_dict = {}
     remapped_dict = {}
     if config.data_version == "V2":

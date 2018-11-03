@@ -1,3 +1,4 @@
+import torch
 from torch.nn import functional as F
 
 from config import config
