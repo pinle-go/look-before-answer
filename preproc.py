@@ -3,9 +3,8 @@ from codecs import open
 from collections import Counter
 
 import numpy as np
-from tqdm import tqdm
-
 import spacy
+from tqdm import tqdm
 
 """
 The content of this file is mostly copied from https://github.com/HKUST-KnowComp/R-Net/blob/master/prepro.py
