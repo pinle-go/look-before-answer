@@ -19,6 +19,7 @@ from tensorboardX import SummaryWriter
 
 from config import config, device
 from preproc import preproc
+from util import get_pred_func, get_loss_func
 
 writer = SummaryWriter("/tmp/tnsr")
 """
@@ -227,7 +228,7 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
-def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, start, ema):
+def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, start, ema, loss_func):
     model.train()
     losses = []
     print(f"Training epoch {start}")
@@ -251,34 +252,10 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, star
             impossibles = impossibles.to(device)
         else:
             p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
+            z = impossibles = None
 
-        if config.data_version == "V2":
-            if config.model_type == "model0":
-                # in this debug model, we basic ignore all no-answer questions
-                p1, p2 = p1[impossibles == 0], p2[impossibles == 0]
-                y1, y2 = y1[impossibles == 0], y2[impossibles == 0]
-
-                p1 = F.log_softmax(p1, dim=1)
-                p2 = F.log_softmax(p2, dim=1)
-                loss1 = F.nll_loss(p1, y1)
-                loss2 = F.nll_loss(p2, y2)
-                loss = loss1 + loss2
-                writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
-            elif config.model_type == "model1":
-                pass
-            elif config.model_type == "model2":
-                pass
-            elif config.model_type == "model3":
-                pass
-            else:
-                raise ValueError()
-        else:
-            p1 = F.log_softmax(p1, dim=1)
-            p2 = F.log_softmax(p2, dim=1)
-            loss1 = F.nll_loss(p1, y1)
-            loss2 = F.nll_loss(p2, y2)
-            loss = loss1 + loss2
-            writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
+        loss = loss_func(p1, p2, y1, y2, z, impossibles)
+        writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
 
         losses.append(loss.item())
         loss.backward()
@@ -306,7 +283,7 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, star
     print("STEP {:8d} Avg_loss {:8f}\n".format(start, loss_avg))
 
 
-def test(model, dataset, eval_file, test_i):
+def test(model, dataset, eval_file, test_i, loss_func, pred_func):
     print("\nTest")
     model.eval()
     answer_dict = {}
@@ -332,58 +309,12 @@ def test(model, dataset, eval_file, test_i):
                 impossibles = impossibles.to(device)
             else:
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
+                z = impossibles = None
 
-            # compute loss and impossible
-            if config.data_version == "V2":
-                if config.model_type == "model0":
-                    ymin, ymax = [], []
-                    for p1_, p2_, z_, y1_, y2_, impossibles_ in zip(
-                        p1, p2, z, y1, y2, impossibles
-                    ):
-                        if z_ < 0.5:  # answerable
-                            outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
-                            outer = torch.triu(outer)
-                            a1, _ = torch.max(outer, dim=1)
-                            a2, _ = torch.max(outer, dim=0)
-                            ymin_ = torch.argmax(a1, dim=0)
-                            ymax_ = torch.argmax(a2, dim=0)
-                        else:
-                            ymin_ = -1
-                            ymax_ = -1
-                        ymin.append(ymin_)
-                        ymax.append(ymax_)
-                    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
-                    loss, losses = torch.FloatTensor([0]), [0]
-                elif config.model_type == "model1":
-                    pass
-                elif config.model_type == "model2":
-                    pass
-                elif config.model_type == "model3":
-                    pass
-                else:
-                    raise ValueError()
-            else:
-                p1 = F.log_softmax(p1, dim=1)
-                p2 = F.log_softmax(p2, dim=1)
-                loss1 = F.nll_loss(p1, y1)
-                loss2 = F.nll_loss(p2, y2)
-                loss = torch.mean(loss1 + loss2)
-                losses.append(loss.item())
+            loss = loss_func(p1, p2, y1, y2, z, impossibles)
+            ymin, ymax = pred_func(p1, p2, z)
 
-                p1 = F.softmax(p1, dim=1)
-                p2 = F.softmax(p2, dim=1)
-
-                # ymin = []
-                # ymax = []
-                outer = torch.matmul(p1.unsqueeze(2), p2.unsqueeze(1))
-                for j in range(outer.size()[0]):
-                    outer[j] = torch.triu(outer[j])
-                    # outer[j] = torch.tril(outer[j], config.ans_limit)
-                a1, _ = torch.max(outer, dim=2)
-                a2, _ = torch.max(outer, dim=1)
-                ymin = torch.argmax(a1, dim=1)
-                ymax = torch.argmax(a2, dim=1)
-
+            losses.append(loss)
             answer_dict_, _ = convert_tokens(
                 eval_file,
                 ids.tolist(),
@@ -398,6 +329,7 @@ def test(model, dataset, eval_file, test_i):
             )
             if (i + 1) == num_batches:
                 break
+    
     loss = np.mean(losses)
     metrics = evaluate(eval_file, answer_dict)
     f = open("log/answers.json", "w")
@@ -470,10 +402,11 @@ def train_entry(config):
             dev_eval_file,
             iter,
             ema,
+            get_loss_func()
         )
         ema.assign(model)
         metrics = test(
-            model, dev_dataset, dev_eval_file, (iter + 1) * len(train_dataset)
+            model, dev_dataset, dev_eval_file, (iter + 1) * len(train_dataset), get_loss_func(), get_pred_func()
         )
         dev_f1 = metrics["f1"]
         dev_em = metrics["exact_match"]
@@ -497,7 +430,7 @@ def test_entry(config):
     dev_dataset = get_loader(config.dev_record_file, config.batch_size)
     fn = os.path.join(config.save_dir, "model.pt")
     model = torch.load(fn)
-    test(model, dev_dataset, dev_eval_file, 0)
+    test(model, dev_dataset, dev_eval_file, 0, get_loss_func(), get_pred_func())
 
 
 def main(_):
