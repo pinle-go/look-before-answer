@@ -426,31 +426,5 @@ class QANetV1(QANet):
         self.out = PointerV1()
 
     def forward(self, Cwid, Ccid, Qwid, Qcid):
-        # import ipdb; ipdb.set_trace()
-        maskC = (torch.zeros_like(Cwid) != Cwid).float()
-        maskQ = (torch.zeros_like(Qwid) != Qwid).float()
-        Cw, Cc = self.word_emb(Cwid), self.char_emb(Ccid)
-        Qw, Qc = self.word_emb(Qwid), self.char_emb(Qcid)
-        C, Q = self.emb(Cc, Cw, Lc), self.emb(Qc, Qw, Lq)
-        Ce = self.emb_enc(C, maskC, 1, 1)
-        Qe = self.emb_enc(Q, maskQ, 1, 1)
-        X = self.cq_att(Ce, Qe, maskC, maskQ)
-        M0 = self.cq_resizer(X)
-        M0 = F.dropout(M0, p=dropout, training=self.training)
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M1 = M0
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M2 = M0
-        M0 = F.dropout(M0, p=dropout, training=self.training)
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M3 = M0
-        p1, p2 = self.out(M1, M2, M3, maskC)
-        p1 = F.softmax(p1, dim=1)
-        p2 = F.softmax(p2, dim=1)
-
-        z = p1[:, -1] * p2[:, -1]
-        p1, p2 = p1[:, :-1], p2[:, :-1]
-        return p1, p2, z
+        p1, p2 = super().forward(Cwid, Ccid, Qwid, Qcid)
+        return p1, p2, torch.zeros((p1.size(0)), device=p1.device)

@@ -27,20 +27,18 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
 
 
 def loss_model1(p1, p2, y1, y2, z, impossibles):
-    # compute loss when possible
-    if len(p1[impossibles == 0]) > 0:
-        p1_ = torch.log(p1[impossibles == 0])
-        p2_ = torch.log(p2[impossibles == 0])
-        loss1 = F.nll_loss(p1_, y1[impossibles == 0])
-        loss2 = F.nll_loss(p2_, y2[impossibles == 0])
-        loss = loss1 + loss2
-    else:
-        loss = 0
+    Lc = p1.size(1) - 1
+    y1[y1 == -1] = Lc
+    y2[y2 == -1] = Lc
+    p1 = F.log_softmax(p1, dim=1)
+    p2 = F.log_softmax(p2, dim=1)
 
-    # compute loss when impossible
-    if len(p1[impossibles != 0]) > 0:
-        # TODO: something might be wrong here
-        loss += -torch.log(z).mean()
+    try:
+        loss1 = F.nll_loss(p1, y1)
+        loss2 = F.nll_loss(p2, y2)
+    except:
+        from IPython import embed; embed()
+    loss = loss1 + loss2
 
     return loss
 
@@ -80,9 +78,12 @@ def pred_model0(p1, p2, z):
 
 def pred_model1(p1, p2, z):
     ymin, ymax = [], []
-    for p1_, p2_, z_ in zip(p1, p2, z):
+
+    for p1_, p2_ in zip(p1, p2):
         outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
         outer = torch.triu(outer)
+        z_ = outer[-1, -1]
+        outer = outer[:-1, :-1]
         if outer.max() > z_:
             a1, _ = torch.max(outer, dim=1)
             a2, _ = torch.max(outer, dim=0)
