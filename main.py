@@ -11,14 +11,14 @@ import torch
 import torch.cuda
 import torch.nn.functional as F
 import torch.optim as optim
-from tqdm import tqdm
 from absl import app
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 from config import config, device
+from model_utils import get_loss_func, get_pred_func
 from preproc import preproc
-from model_utils import get_pred_func, get_loss_func
-from utils import EMA, get_loader, convert_tokens
+from utils import EMA, convert_tokens, get_loader
 
 writer = SummaryWriter("/tmp/tnsr")
 """
@@ -54,10 +54,10 @@ def train(
             Qcid.to(device),
         )
         y1, y2 = y1.to(device), y2.to(device)
-    
+
         if config.data_version == "V2":
             p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
-            impossibles = impossibles.to(device)        
+            impossibles = impossibles.to(device)
             if config.model_type == "model0":
                 # in this debug model, we basic ignore all no-answer questions
                 p1, p2 = p1[impossibles == 0], p2[impossibles == 0]
@@ -144,7 +144,7 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
             if config.data_version == "V2":
                 p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
                 impossibles = impossibles.to(device)
-            
+
                 if config.model_type == "model0":
                     ymin, ymax = [], []
                     for p1_, p2_, z_, y1_, y2_, impossibles_ in zip(
@@ -236,7 +236,6 @@ def train_entry(config):
         QANet = QANetV0
     if config.model_type == "model1":
         QANet = QANet
-        
 
     with open(config.word_emb_file, "rb") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)

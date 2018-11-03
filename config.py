@@ -1,9 +1,8 @@
 import os
 
+import absl.flags as flags
 import torch
 import torch.backends.cudnn as cudnn
-
-import absl.flags as flags
 
 """
 The content of this file is mostly copied from https://github.com/HKUST-KnowComp/R-Net/blob/master/config.py
