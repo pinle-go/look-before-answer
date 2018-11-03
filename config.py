@@ -22,7 +22,6 @@ else:
     test_file = os.path.join(home, "data", "squad", "dev-v1.1.json")
 
 glove_word_file = os.path.join(home, "data", "glove", "glove.840B.300d.txt")
-data_version = "V2"
 target_dir = "data" + "_" + data_version
 event_dir = "log"
 save_dir = "model"

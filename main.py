@@ -36,21 +36,35 @@ class SQuADDataset(Dataset):
         self.y1s = data["y1s"]
         self.y2s = data["y2s"]
         self.ids = data["ids"]
+        if config.data_version == "V2":
+            self.impossibles = data["impossibles"].astype(np.int)
         self.num = len(self.ids)
 
     def __len__(self):
         return self.num
 
     def __getitem__(self, idx):
-        return (
-            self.context_idxs[idx],
-            self.context_char_idxs[idx],
-            self.ques_idxs[idx],
-            self.ques_char_idxs[idx],
-            self.y1s[idx],
-            self.y2s[idx],
-            self.ids[idx],
-        )
+        if config.data_version == "V2":
+            return (
+                self.context_idxs[idx],
+                self.context_char_idxs[idx],
+                self.ques_idxs[idx],
+                self.ques_char_idxs[idx],
+                self.y1s[idx],
+                self.y2s[idx],
+                self.ids[idx],
+                self.impossibles[idx],
+            )
+        else:
+            return (
+                self.context_idxs[idx],
+                self.context_char_idxs[idx],
+                self.ques_idxs[idx],
+                self.ques_char_idxs[idx],
+                self.y1s[idx],
+                self.y2s[idx],
+                self.ids[idx],
+            )
 
 
 class EMA:
@@ -84,19 +98,34 @@ class EMA:
                 param.data = self.original[name]
 
 
-def collate(data):
-    Cwid, Ccid, Qwid, Qcid, y1, y2, ids = zip(*data)
-    Cwid = torch.tensor(Cwid).long()
-    Ccid = torch.tensor(Ccid).long()
-    Qwid = torch.tensor(Qwid).long()
-    Qcid = torch.tensor(Qcid).long()
-    y1 = torch.from_numpy(np.array(y1)).long()
-    y2 = torch.from_numpy(np.array(y2)).long()
-    ids = torch.from_numpy(np.array(ids)).long()
-    return Cwid, Ccid, Qwid, Qcid, y1, y2, ids
-
-
 def get_loader(npz_file, batch_size):
+    if config.data_version == "V2":
+
+        def collate(data):
+            Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles = zip(*data)
+            Cwid = torch.tensor(Cwid).long()
+            Ccid = torch.tensor(Ccid).long()
+            Qwid = torch.tensor(Qwid).long()
+            Qcid = torch.tensor(Qcid).long()
+            y1 = torch.from_numpy(np.array(y1)).long()
+            y2 = torch.from_numpy(np.array(y2)).long()
+            ids = torch.from_numpy(np.array(ids)).long()
+            impossibles = torch.from_numpy(np.array(impossibles)).long()
+            return Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles
+
+    else:
+
+        def collate(data):
+            Cwid, Ccid, Qwid, Qcid, y1, y2, ids = zip(*data)
+            Cwid = torch.tensor(Cwid).long()
+            Ccid = torch.tensor(Ccid).long()
+            Qwid = torch.tensor(Qwid).long()
+            Qcid = torch.tensor(Qcid).long()
+            y1 = torch.from_numpy(np.array(y1)).long()
+            y2 = torch.from_numpy(np.array(y2)).long()
+            ids = torch.from_numpy(np.array(ids)).long()
+            return Cwid, Ccid, Qwid, Qcid, y1, y2, ids
+
     dataset = SQuADDataset(npz_file, batch_size)
     data_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -108,17 +137,35 @@ def get_loader(npz_file, batch_size):
     return data_loader
 
 
-def convert_tokens(eval_file, qa_id, pp1, pp2):
+def convert_tokens(eval_file, qa_id, pp1, pp2, zz=None):
+    import ipdb
+
+    ipdb.set_trace()
     answer_dict = {}
     remapped_dict = {}
-    for qid, p1, p2 in zip(qa_id, pp1, pp2):
-        context = eval_file[str(qid)]["context"]
-        spans = eval_file[str(qid)]["spans"]
-        uuid = eval_file[str(qid)]["uuid"]
-        start_idx = spans[p1][0]
-        end_idx = spans[p2][1]
-        answer_dict[str(qid)] = context[start_idx:end_idx]
-        remapped_dict[uuid] = context[start_idx:end_idx]
+    if config.data_version == "V2":
+        for qid, p1, p2, z in zip(qa_id, pp1, pp2, zz):
+            if float(z) == 1:
+                answer_dict[str(qid)] = ""
+                remapped_dict[str(qid)] = ""
+            else:
+                context = eval_file[str(qid)]["context"]
+                spans = eval_file[str(qid)]["spans"]
+                uuid = eval_file[str(qid)]["uuid"]
+                print(qid)
+                start_idx = spans[p1][0]
+                end_idx = spans[p2][1]
+                answer_dict[str(qid)] = context[start_idx:end_idx]
+                remapped_dict[uuid] = context[start_idx:end_idx]
+    else:
+        for qid, p1, p2 in zip(qa_id, pp1, pp2):
+            context = eval_file[str(qid)]["context"]
+            spans = eval_file[str(qid)]["spans"]
+            uuid = eval_file[str(qid)]["uuid"]
+            start_idx = spans[p1][0]
+            end_idx = spans[p2][1]
+            answer_dict[str(qid)] = context[start_idx:end_idx]
+            remapped_dict[uuid] = context[start_idx:end_idx]
     return answer_dict, remapped_dict
 
 
@@ -184,7 +231,12 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, star
     model.train()
     losses = []
     print(f"Training epoch {start}")
-    for i, (Cwid, Ccid, Qwid, Qcid, y1, y2, ids) in enumerate(dataset):
+    for i, batch in enumerate(dataset):
+        if config.data_version == "V2":
+            Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles = batch
+        else:
+            Cwid, Ccid, Qwid, Qcid, y1, y2, ids = batch
+
         optimizer.zero_grad()
         Cwid, Ccid, Qwid, Qcid = (
             Cwid.to(device),
@@ -192,14 +244,42 @@ def train(model, optimizer, scheduler, dataset, dev_dataset, dev_eval_file, star
             Qwid.to(device),
             Qcid.to(device),
         )
-        p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
         y1, y2 = y1.to(device), y2.to(device)
-        p1 = F.log_softmax(p1, dim=1)
-        p2 = F.log_softmax(p2, dim=1)
-        loss1 = F.nll_loss(p1, y1)
-        loss2 = F.nll_loss(p2, y2)
-        loss = loss1 + loss2
-        writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
+
+        if config.data_version == "V2":
+            p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
+            impossibles = impossibles.to(device)
+        else:
+            p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
+
+        if config.data_version == "V2":
+            if config.model_type == "model0":
+                # in this debug model, we basic ignore all no-answer questions
+                p1, p2 = p1[impossibles == 0], p2[impossibles == 0]
+                y1, y2 = y1[impossibles == 0], y2[impossibles == 0]
+
+                p1 = F.log_softmax(p1, dim=1)
+                p2 = F.log_softmax(p2, dim=1)
+                loss1 = F.nll_loss(p1, y1)
+                loss2 = F.nll_loss(p2, y2)
+                loss = loss1 + loss2
+                writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
+            elif config.model_type == "model1":
+                pass
+            elif config.model_type == "model2":
+                pass
+            elif config.model_type == "model3":
+                pass
+            else:
+                raise ValueError()
+        else:
+            p1 = F.log_softmax(p1, dim=1)
+            p2 = F.log_softmax(p2, dim=1)
+            loss1 = F.nll_loss(p1, y1)
+            loss2 = F.nll_loss(p2, y2)
+            loss = loss1 + loss2
+            writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
+
         losses.append(loss.item())
         loss.backward()
         torch.nn.utils.clip_grad_value_(model.parameters(), config.grad_clip)
@@ -233,39 +313,83 @@ def test(model, dataset, eval_file, test_i):
     losses = []
     num_batches = config.val_num_batches
     with torch.no_grad():
-        for i, (Cwid, Ccid, Qwid, Qcid, y1, y2, ids) in enumerate(dataset):
+        for i, batch in enumerate(dataset):
+            if config.data_version == "V2":
+                Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles = batch
+            else:
+                Cwid, Ccid, Qwid, Qcid, y1, y2, ids = batch
+
             Cwid, Ccid, Qwid, Qcid = (
                 Cwid.to(device),
                 Ccid.to(device),
                 Qwid.to(device),
                 Qcid.to(device),
             )
-
-            P1, P2 = model(Cwid, Ccid, Qwid, Qcid)
             y1, y2 = y1.to(device), y2.to(device)
-            p1 = F.log_softmax(P1, dim=1)
-            p2 = F.log_softmax(P2, dim=1)
-            loss1 = F.nll_loss(p1, y1)
-            loss2 = F.nll_loss(p2, y2)
-            loss = torch.mean(loss1 + loss2)
-            losses.append(loss.item())
 
-            p1 = F.softmax(P1, dim=1)
-            p2 = F.softmax(P2, dim=1)
+            if config.data_version == "V2":
+                p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
+                impossibles = impossibles.to(device)
+            else:
+                p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
 
-            # ymin = []
-            # ymax = []
-            outer = torch.matmul(p1.unsqueeze(2), p2.unsqueeze(1))
-            for j in range(outer.size()[0]):
-                outer[j] = torch.triu(outer[j])
-                # outer[j] = torch.tril(outer[j], config.ans_limit)
-            a1, _ = torch.max(outer, dim=2)
-            a2, _ = torch.max(outer, dim=1)
-            ymin = torch.argmax(a1, dim=1)
-            ymax = torch.argmax(a2, dim=1)
+            # compute loss and impossible
+            if config.data_version == "V2":
+                if config.model_type == "model0":
+                    ymin, ymax = [], []
+                    for p1_, p2_, z_, y1_, y2_, impossibles_ in zip(
+                        p1, p2, z, y1, y2, impossibles
+                    ):
+                        if z_ < 0.5:  # answerable
+                            outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
+                            outer = torch.triu(outer)
+                            a1, _ = torch.max(outer, dim=1)
+                            a2, _ = torch.max(outer, dim=0)
+                            ymin_ = torch.argmax(a1, dim=0)
+                            ymax_ = torch.argmax(a2, dim=0)
+                        else:
+                            ymin_ = -1
+                            ymax_ = -1
+                        ymin.append(ymin_)
+                        ymax.append(ymax_)
+                    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
+                    loss, losses = torch.FloatTensor([0]), [0]
+                elif config.model_type == "model1":
+                    pass
+                elif config.model_type == "model2":
+                    pass
+                elif config.model_type == "model3":
+                    pass
+                else:
+                    raise ValueError()
+            else:
+                p1 = F.log_softmax(p1, dim=1)
+                p2 = F.log_softmax(p2, dim=1)
+                loss1 = F.nll_loss(p1, y1)
+                loss2 = F.nll_loss(p2, y2)
+                loss = torch.mean(loss1 + loss2)
+                losses.append(loss.item())
+
+                p1 = F.softmax(p1, dim=1)
+                p2 = F.softmax(p2, dim=1)
+
+                # ymin = []
+                # ymax = []
+                outer = torch.matmul(p1.unsqueeze(2), p2.unsqueeze(1))
+                for j in range(outer.size()[0]):
+                    outer[j] = torch.triu(outer[j])
+                    # outer[j] = torch.tril(outer[j], config.ans_limit)
+                a1, _ = torch.max(outer, dim=2)
+                a2, _ = torch.max(outer, dim=1)
+                ymin = torch.argmax(a1, dim=1)
+                ymax = torch.argmax(a2, dim=1)
 
             answer_dict_, _ = convert_tokens(
-                eval_file, ids.tolist(), ymin.tolist(), ymax.tolist()
+                eval_file,
+                ids.tolist(),
+                ymin.tolist(),
+                ymax.tolist(),
+                zz=(z.tolist() if config.data_version == "V2" else None),
             )
             answer_dict.update(answer_dict_)
             print(
@@ -293,7 +417,10 @@ def test(model, dataset, eval_file, test_i):
 
 
 def train_entry(config):
-    from models import QANet
+    from models import QANet, QANetV0
+
+    if config.model_type == "model0":
+        QANet = QANetV0
 
     with open(config.word_emb_file, "rb") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)
