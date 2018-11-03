@@ -41,6 +41,8 @@ def pred_origin(p1, p2, z):
 
 def pred_model0(p1, p2, z):
     ymin, ymax = [], []
+    p1 = F.softmax(p1, dim=1)
+    p2 = F.softmax(p2, dim=1)
     for p1_, p2_, z_ in zip(p1, p2, z):
         if z_ < 0.5:  # answerable
             outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
