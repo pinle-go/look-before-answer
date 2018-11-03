@@ -260,7 +260,7 @@ def main(_):
         config.val_num_batches = 2
         config.checkpoint = 2
         config.period = 1
-        train_entry(config)
+        train_entry(config, get_model_func())
     elif config.mode == "test":
         test_entry(config)
     else:
