@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from config import config
+from config import config, device
 
 D = config.connector_dim
 Nh = config.num_heads
@@ -65,7 +65,10 @@ def PosEncoder(x, min_timescale=1.0, max_timescale=1.0e4):
     channels = x.size()[2]
     signal = get_timing_signal(length, channels, min_timescale, max_timescale)
     # TODO: fix this .cuda()
-    return (x + signal.cuda()).transpose(1, 2)
+    if device == "cpu":
+        return (x + signal).transpose(1, 2)
+    else:
+        return (x + signal.cuda()).transpose(1, 2)
 
 
 def get_timing_signal(length, channels, min_timescale=1.0, max_timescale=1.0e4):
@@ -388,3 +391,11 @@ class QANet(nn.Module):
         M3 = M0
         p1, p2 = self.out(M1, M2, M3, maskC)
         return p1, p2
+
+
+class QANetV0(QANet):
+    def forward(self, Cwid, Ccid, Qwid, Qcid):
+        p1, p2 = super().forward(Cwid, Ccid, Qwid, Qcid)
+        batch_size = p1.size(0)
+        fake_z = torch.rand(batch_size, device=p1.device)
+        return p1, p2, fake_z
