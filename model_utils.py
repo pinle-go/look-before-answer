@@ -90,4 +90,20 @@ def get_pred_func():
         return pred_origin
 
 
-__all__ = ["get_loss_func", "get_pred_func"]
+def get_model_func():
+    from models import QANet, QANetV0
+    if config.data_version == "V2":
+        if config.model_type == "model0":
+            return QANetV0
+        elif config.model_type == "model1":
+            raise NotImplementedError()
+        elif config.model_type == "model2":
+            raise NotImplementedError()
+        elif config.model_type == "model3":
+            raise NotImplementedError()
+        else:
+            raise ValueError()
+    else:
+        return QANet 
+
+__all__ = ["get_loss_func", "get_pred_func", "get_model_func"]

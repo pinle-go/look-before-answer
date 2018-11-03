@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
 from config import config, device
-from model_utils import get_loss_func, get_pred_func
+from model_utils import get_loss_func, get_model_func, get_pred_func
 from preproc import preproc
 from utils import EMA, convert_tokens, get_loader
 
@@ -229,14 +229,7 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
     return metrics
 
 
-def train_entry(config):
-    from models import QANet, QANetV0
-
-    if config.model_type == "model0":
-        QANet = QANetV0
-    if config.model_type == "model1":
-        QANet = QANet
-
+def train_entry(config, model_func):
     with open(config.word_emb_file, "rb") as fh:
         word_mat = np.array(json.load(fh), dtype=np.float32)
     with open(config.char_emb_file, "rb") as fh:
@@ -253,7 +246,7 @@ def train_entry(config):
     base_lr = 1
     lr_warm_up_num = config.lr_warm_up_num
 
-    model = QANet(word_mat, char_mat).to(device)
+    model = model_func(word_mat, char_mat).to(device)
     if torch.cuda.is_available():
         model = torch.nn.DataParallel(model)
 
@@ -323,7 +316,7 @@ def test_entry(config):
 
 def main(_):
     if config.mode == "train":
-        train_entry(config)
+        train_entry(config, get_model_func())
     elif config.mode == "data":
         preproc(config)
     elif config.mode == "debug":
