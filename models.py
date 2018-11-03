@@ -124,7 +124,7 @@ class Highway(nn.Module):
     def forward(self, x):
         # x: shape [batch_size, hidden_size, length]
         for i in range(self.n):
-            gate = F.sigmoid(self.gate[i](x))
+            gate = torch.sigmoid(self.gate[i](x))
             nonlinear = self.linear[i](x)
             nonlinear = F.dropout(nonlinear, p=dropout, training=self.training)
             x = gate * nonlinear + (1 - gate) * x
@@ -369,16 +369,36 @@ class QANet(nn.Module):
         self.out = Pointer()
 
     def forward(self, Cwid, Ccid, Qwid, Qcid):
+        # compute masks first
         maskC = (torch.zeros_like(Cwid) != Cwid).float()
         maskQ = (torch.zeros_like(Qwid) != Qwid).float()
+        
+        # compute embeddings
+        # word embeddings are 300 dim
+        # char embeddings are 16 (chars) x64 dim
         Cw, Cc = self.word_emb(Cwid), self.char_emb(Ccid)
         Qw, Qc = self.word_emb(Qwid), self.char_emb(Qcid)
+        
+        # combine char and word  embeddings
+        # output is 96 dim vector for each word in ques/para
+        # C = [96X400], Q = [96X50]
         C, Q = self.emb(Cc, Cw, Lc), self.emb(Qc, Qw, Lq)
+        
+        # embeddings encoder
+        # output is same size as input
         Ce = self.emb_enc(C, maskC, 1, 1)
         Qe = self.emb_enc(Q, maskQ, 1, 1)
+        
+        # Context query attention
         X = self.cq_att(Ce, Qe, maskC, maskQ)
+        
+        # convolution resizer?
+        # M0 = [96X400]
         M0 = self.cq_resizer(X)
+        
         M0 = F.dropout(M0, p=dropout, training=self.training)
+        
+        # pass through encoder blocks
         for i, blk in enumerate(self.model_enc_blks):
             M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
         M1 = M0
@@ -389,6 +409,9 @@ class QANet(nn.Module):
         for i, blk in enumerate(self.model_enc_blks):
             M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
         M3 = M0
+        
+        # use M1,M2 for start prob
+        # use M1,M3 for end prob
         p1, p2 = self.out(M1, M2, M3, maskC)
         return p1, p2
 
