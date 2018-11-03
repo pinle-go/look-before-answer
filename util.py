@@ -63,7 +63,7 @@ def get_loss_func():
         if config.model_type == "model0":
             return loss_model0
         elif config.model_type == "model1":
-            raise NotImplementedError()
+            return loss_origin
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
@@ -79,7 +79,7 @@ def get_pred_func():
         if config.model_type == "model0":
             return pred_model0
         elif config.model_type == "model1":
-            raise NotImplementedError()
+            return pred_origin
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
