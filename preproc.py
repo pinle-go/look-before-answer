@@ -271,18 +271,11 @@ def build_features(
 
     def filter_func(example, is_test=False):
         if config.data_version == "V2":
-            try:
-                if example["is_impossible"]:
-                    return (
-                        len(example["context_tokens"]) > para_limit
-                        or len(example["ques_tokens"]) > ques_limit
-                    )
-            except Exception as e:
-                print(example)
-                print(e)
-                import ipdb
-
-                ipdb.trace()
+            if example["is_impossible"]:
+                return (
+                    len(example["context_tokens"]) > para_limit
+                    or len(example["ques_tokens"]) > ques_limit
+                )
 
         return (
             len(example["context_tokens"]) > para_limit
@@ -361,6 +354,9 @@ def build_features(
             impossibles.append(example["is_impossible"])
         else:
             start, end = example["y1s"][-1], example["y2s"][-1]
+            y1s.append(start)
+            y2s.append(end)
+            ids.append(example["id"])
 
     if config.data_version == "V2":
         np.savez(
