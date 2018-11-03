@@ -58,33 +58,12 @@ def train(
         if config.data_version == "V2":
             p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
             impossibles = impossibles.to(device)
-            if config.model_type == "model0":
-                # in this debug model, we basic ignore all no-answer questions
-                p1, p2 = p1[impossibles == 0], p2[impossibles == 0]
-                y1, y2 = y1[impossibles == 0], y2[impossibles == 0]
-
-                p1 = F.log_softmax(p1, dim=1)
-                p2 = F.log_softmax(p2, dim=1)
-                loss1 = F.nll_loss(p1, y1)
-                loss2 = F.nll_loss(p2, y2)
-                loss = loss1 + loss2
-                writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
-            elif config.model_type == "model1":
-                pass
-            elif config.model_type == "model2":
-                pass
-            elif config.model_type == "model3":
-                pass
-            else:
-                raise ValueError()
         else:
             p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
-            p1 = F.log_softmax(p1, dim=1)
-            p2 = F.log_softmax(p2, dim=1)
-            loss1 = F.nll_loss(p1, y1)
-            loss2 = F.nll_loss(p2, y2)
-            loss = loss1 + loss2
-            writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
+            z = impossibles = None
+
+        loss = loss_func(p1, p2, y1, y2, z, impossibles)
+        writer.add_scalar("data/loss", loss.item(), i + start * len(dataset))
 
         losses.append(loss.item())
         loss.backward()
@@ -144,56 +123,12 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
             if config.data_version == "V2":
                 p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
                 impossibles = impossibles.to(device)
-
-                if config.model_type == "model0":
-                    ymin, ymax = [], []
-                    for p1_, p2_, z_, y1_, y2_, impossibles_ in zip(
-                        p1, p2, z, y1, y2, impossibles
-                    ):
-                        if z_ < 0.5:  # answerable
-                            outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
-                            outer = torch.triu(outer)
-                            a1, _ = torch.max(outer, dim=1)
-                            a2, _ = torch.max(outer, dim=0)
-                            ymin_ = torch.argmax(a1, dim=0)
-                            ymax_ = torch.argmax(a2, dim=0)
-                        else:
-                            ymin_ = -1
-                            ymax_ = -1
-                        ymin.append(ymin_)
-                        ymax.append(ymax_)
-                    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
-                    loss, losses = torch.FloatTensor([0]), [0]
-                elif config.model_type == "model1":
-                    pass
-                elif config.model_type == "model2":
-                    pass
-                elif config.model_type == "model3":
-                    pass
-                else:
-                    raise ValueError()
             else:
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
-                p1 = F.log_softmax(p1, dim=1)
-                p2 = F.log_softmax(p2, dim=1)
-                loss1 = F.nll_loss(p1, y1)
-                loss2 = F.nll_loss(p2, y2)
-                loss = torch.mean(loss1 + loss2)
-                losses.append(loss.item())
+                z = impossibles = None
 
-                p1 = F.softmax(p1, dim=1)
-                p2 = F.softmax(p2, dim=1)
-
-                # ymin = []
-                # ymax = []
-                outer = torch.matmul(p1.unsqueeze(2), p2.unsqueeze(1))
-                for j in range(outer.size()[0]):
-                    outer[j] = torch.triu(outer[j])
-                    # outer[j] = torch.tril(outer[j], config.ans_limit)
-                a1, _ = torch.max(outer, dim=2)
-                a2, _ = torch.max(outer, dim=1)
-                ymin = torch.argmax(a1, dim=1)
-                ymax = torch.argmax(a2, dim=1)
+            loss = loss_func(p1, p2, y1, y2, z, impossibles)
+            ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
             answer_dict_, _ = convert_tokens(

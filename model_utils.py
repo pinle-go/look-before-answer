@@ -92,6 +92,7 @@ def get_pred_func():
 
 def get_model_func():
     from models import QANet, QANetV0
+
     if config.data_version == "V2":
         if config.model_type == "model0":
             return QANetV0
@@ -104,6 +105,7 @@ def get_model_func():
         else:
             raise ValueError()
     else:
-        return QANet 
+        return QANet
+
 
 __all__ = ["get_loss_func", "get_pred_func", "get_model_func"]
