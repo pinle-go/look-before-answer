@@ -151,18 +151,16 @@ def convert_tokens(eval_file, qa_id, pp1, pp2, zz=None):
 
 def evaluate(eval_file, answer_dict):
     if config.data_version == "V2":
-        f1 = exact_match = total = count_answerable = 0
+        f1 = exact_match = total = correct_answerable = 0
         for key, value in answer_dict.items():
             total += 1
-            ground_truth_answerable = len(eval_file[key]["answers"]) > 0
-
-            ground_truths = (
-                eval_file[key]["answers"] if ground_truth_answerable else [""]
-            )
+            is_answerable = len(eval_file[key]["answers"]) > 0
+            ground_truths = eval_file[key]["answers"] if is_answerable else [""]
             prediction = value
-
-            if prediction != "" and ground_truth_answerable:
-                count_answerable += 1
+            if (prediction != "" and is_answerable) or (
+                prediction == "" and not is_answerable
+            ):
+                correct_answerable += 1
 
             exact_match += metric_max_over_ground_truths(
                 exact_match_score, prediction, ground_truths
@@ -170,7 +168,7 @@ def evaluate(eval_file, answer_dict):
             f1 += metric_max_over_ground_truths(f1_score, prediction, ground_truths)
         exact_match = 100.0 * exact_match / total
         f1 = 100.0 * f1 / total
-        answerability_acc = count_answerable / total
+        answerability_acc = 100.0 * correct_answerable / total
         return {
             "exact_match": exact_match,
             "f1": f1,
@@ -188,7 +186,6 @@ def evaluate(eval_file, answer_dict):
             f1 += metric_max_over_ground_truths(f1_score, prediction, ground_truths)
         exact_match = 100.0 * exact_match / total
         f1 = 100.0 * f1 / total
-        answerability_acc = count_answerable / total
         return {"exact_match": exact_match, "f1": f1}
 
 
