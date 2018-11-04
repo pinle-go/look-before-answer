@@ -18,7 +18,7 @@ from tqdm import tqdm
 from config import config, device
 from model_utils import get_loss_func, get_model_func, get_pred_func
 from preproc import preproc
-from utils import EMA, convert_tokens, get_loader, evaluate
+from utils import EMA, convert_tokens, evaluate, get_loader
 
 writer = SummaryWriter("/tmp/tnsr")
 """

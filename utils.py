@@ -1,7 +1,7 @@
 import re
-from collections import Counter
-import re
 import string
+from collections import Counter
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
