@@ -422,3 +422,32 @@ class QANetV0(QANet):
         batch_size = p1.size(0)
         fake_z = torch.rand(batch_size, device=p1.device)
         return p1, p2, fake_z
+
+
+class PointerV1(Pointer):
+    def forward(self, M1, M2, M3, mask):
+        size = list(M1.size())
+        size[2] = 1
+
+        M1_pad = torch.ones(size, device=M1.device)
+        M2_pad = torch.ones(size, device=M2.device)
+        M3_pad = torch.ones(size, device=M3.device)
+        mask_pad = torch.ones((mask.size(0), 1), device=mask.device)
+
+        M1 = torch.cat([M1, M1_pad], dim=2)
+        M2 = torch.cat([M2, M2_pad], dim=2)
+        M3 = torch.cat([M3, M3_pad], dim=2)
+        mask = torch.cat([mask, mask_pad], dim=1)
+
+        return super().forward(M1, M2, M3, mask)
+
+
+class QANetV1(QANet):
+    def __init__(self, word_mat, char_mat):
+        super().__init__(word_mat, char_mat)
+
+        self.out = PointerV1()
+
+    def forward(self, Cwid, Ccid, Qwid, Qcid):
+        p1, p2 = super().forward(Cwid, Ccid, Qwid, Qcid)
+        return p1, p2, torch.zeros((p1.size(0)), device=p1.device)

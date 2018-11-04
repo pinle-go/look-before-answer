@@ -192,7 +192,7 @@ def train_entry(config, model_func):
     lr_warm_up_num = config.lr_warm_up_num
 
     model = model_func(word_mat, char_mat).to(device)
-    if torch.cuda.is_available():
+    if device != "cpu" and torch.cuda.is_available():
         model = torch.nn.DataParallel(model)
 
     ema = EMA(config.decay)

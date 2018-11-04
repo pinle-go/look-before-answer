@@ -26,6 +26,23 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
     return loss
 
 
+def loss_model1(p1, p2, y1, y2, z, impossibles):
+    Lc = p1.size(1) - 1
+    y1[y1 == -1] = Lc
+    y2[y2 == -1] = Lc
+    p1 = F.log_softmax(p1, dim=1)
+    p2 = F.log_softmax(p2, dim=1)
+
+    try:
+        loss1 = F.nll_loss(p1, y1)
+        loss2 = F.nll_loss(p2, y2)
+    except:
+        from IPython import embed; embed()
+    loss = loss1 + loss2
+
+    return loss
+
+
 def pred_origin(p1, p2, z):
     p1 = F.softmax(p1, dim=1)
     p2 = F.softmax(p2, dim=1)
@@ -59,13 +76,35 @@ def pred_model0(p1, p2, z):
     ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
     return ymin, ymax
 
+def pred_model1(p1, p2, z):
+    ymin, ymax = [], []
+    p1 = F.softmax(p1, dim=1)
+    p2 = F.softmax(p2, dim=1)
+    for p1_, p2_ in zip(p1, p2):
+        outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
+        outer = torch.triu(outer)
+        z_ = outer[-1, -1]
+        outer = outer[:-1, :-1]
+        if outer.max() > z_:
+            a1, _ = torch.max(outer, dim=1)
+            a2, _ = torch.max(outer, dim=0)
+            ymin_ = torch.argmax(a1, dim=0)
+            ymax_ = torch.argmax(a2, dim=0)
+        else:
+            ymin_ = -1
+            ymax_ = -1
+        ymin.append(ymin_)
+        ymax.append(ymax_)
+    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
+    return ymin, ymax
+
 
 def get_loss_func():
     if config.data_version == "V2":
         if config.model_type == "model0":
             return loss_model0
         elif config.model_type == "model1":
-            return loss_origin
+            return loss_model1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
@@ -81,7 +120,7 @@ def get_pred_func():
         if config.model_type == "model0":
             return pred_model0
         elif config.model_type == "model1":
-            return pred_origin
+            return pred_model1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
@@ -93,13 +132,13 @@ def get_pred_func():
 
 
 def get_model_func():
-    from models import QANet, QANetV0
+    from models import QANet, QANetV0, QANetV1
 
     if config.data_version == "V2":
         if config.model_type == "model0":
             return QANetV0
         elif config.model_type == "model1":
-            raise NotImplementedError()
+            return QANetV1
         elif config.model_type == "model2":
             raise NotImplementedError()
         elif config.model_type == "model3":
