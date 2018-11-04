@@ -136,7 +136,7 @@ def test(model, dataset, eval_file, test_i, loss_func, pred_func):
                 ids.tolist(),
                 ymin.tolist(),
                 ymax.tolist(),
-                zz=(z.tolist() if config.data_version == "V2" else None),
+                zz=(impossibles.tolist() if config.data_version == "V2" else None),
             )
             answer_dict.update(answer_dict_)
             print(
