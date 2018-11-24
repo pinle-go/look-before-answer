@@ -2,8 +2,6 @@ import string
 import re
 from collections import Counter
 
-# TODO: review evaluation
-
 
 def evaluate(eval_file, answer_dict, version):
     if version == "v2.0":

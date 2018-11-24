@@ -54,6 +54,7 @@ class Trainer:
         self.dev_eval = dev_eval
         self.config = config
         self.model = model
+        self.num_epoch = 0
 
         def lr_calc(ee):
             cr = config.learning_rate / math.log2(config.lr_warm_up_num)
@@ -79,15 +80,13 @@ class Trainer:
             if param.requires_grad:
                 self.ema.register(name, param.data)
 
-    def train_epoch(self, epoch_num):
+    def train_epoch(self, epoch_num, best_loss, no_improvement_step):
         self.model.train()
         device, version, checkpoint = (
             self.config.device,
             self.config.version,
             self.config.checkpoint,
         )
-        no_improvement_step = 0
-        best_loss = 10000
         losses = []
         for i, batch in enumerate(self.train_data):
             loss = self.train_iter(
@@ -161,10 +160,12 @@ class Trainer:
         return loss
 
     def train(self):
-        for i in range(self.config.max_epochs):
+        best_loss = 10000
+        no_improvement_step = 0  
+        for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
             print(f"Training epoch {i}")
-            loss, stop = self.train_epoch(i)
+            loss, stop = self.train_epoch(i, best_loss, no_improvement_step)
             print(f"epoch: {i}; loss : {loss}")
             if stop:
                 print(
@@ -240,7 +241,7 @@ def train(args, config):
 def evaluate(model, dataset, eval_file, config):
     print()
     model.eval()
-    answer_dict = {}
+    answer_dict_id, answer_dict_uuid = {}, {}
     losses = []
     version, device = config.version, config.device
 
@@ -275,7 +276,7 @@ def evaluate(model, dataset, eval_file, config):
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
-            answer_dict_, _ = data.convert_tokens(
+            answer_dict_id_, answer_dict_uuid_ = data.convert_tokens(
                 eval_file,
                 ids.tolist(),
                 ymin.tolist(),
@@ -284,18 +285,22 @@ def evaluate(model, dataset, eval_file, config):
                 version=config.version,
             )
 
-            answer_dict.update(answer_dict_)
+            answer_dict_id.update(answer_dict_id_)
+            answer_dict_uuid.update(answer_dict_uuid_)
+
             print(
                 "\rSTEP {:8d}/{} loss {:8f}".format(i + 1, len(dataset), loss.item()),
                 end="",
             )
 
     loss = np.mean(losses)
-    metrics = evaluation.evaluate(eval_file, answer_dict, config.version)
+    # eval file is indexed by uuid so we use uuid dictionary
+    metrics = evaluation.evaluate(eval_file, answer_dict_uuid, config.version)
     with open(f"{config.answer_file}", "w") as f:
-        json.dump(answer_dict, f)
+        json.dump(answer_dict_uuid, f)
 
     metrics["loss"] = loss
+    print()
     if version == "v2.0":
         print(
             "EVAL loss {:8f} F1 {:8f} EM {:8f} answer possible {:8f}\n".format(
