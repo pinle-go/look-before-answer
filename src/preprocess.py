@@ -128,14 +128,14 @@ def process_file(filename, data_type, word_counter, char_counter, version="v2.0"
                         examples.append(example)
                         # note eval files are now indexed by uuid here
                         
-                        eval_examples[str(qa["id"])] = {
+                        eval_examples[str(total)] = {
                             "context": context,
                             "spans": spans,
                             "answers": answer_texts,
                             "plausible_answers": plausible_answer_texts,
                             "uuid": qa["id"],
                             "is_impossible": is_impossible,
-                            "count": total
+                            
                         }
                     elif version == "v1.1":  # v1.1 case
                         y1s, y2s = [], []
@@ -158,12 +158,11 @@ def process_file(filename, data_type, word_counter, char_counter, version="v2.0"
                         }
                         examples.append(example)
                         # note eval files are now indexed by uuid here
-                        eval_examples[str(qa["id"])] = {
+                        eval_examples[str(total)] = {
                             "context": context,
                             "spans": spans,
                             "answers": answer_texts,
                             "uuid": qa["id"],
-                            "count": total,
                         }
         print(f"{len(examples)} questions in total")
     return examples, eval_examples

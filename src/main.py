@@ -294,8 +294,8 @@ def evaluate(model, dataset, eval_file, config):
             )
 
     loss = np.mean(losses)
-    # eval file is indexed by uuid so we use uuid dictionary
-    metrics = evaluation.evaluate(eval_file, answer_dict_uuid, config.version)
+    # eval file is indexed by id so we use id dictionary
+    metrics = evaluation.evaluate(eval_file, answer_dict_id, config.version)
     with open(f"{config.answer_file}", "w") as f:
         json.dump(answer_dict_uuid, f)
 
