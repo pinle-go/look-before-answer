@@ -19,7 +19,7 @@ unzip $GLOVE_DIR/glove.840B.300d.zip -d $GLOVE_DIR
 #unzip $GLOVE_DIR/glove.6B.zip -d $GLOVE_DIR
 
 # Download Glove Character Embedding
-# wget https://raw.githubusercontent.com/minimaxir/char-embeddings/master/glove.840B.300d-char.txt -O $GLOVE_DIR/glove.840B.300d-char.txt
+wget https://raw.githubusercontent.com/minimaxir/char-embeddings/master/glove.840B.300d-char.txt -O $GLOVE_DIR/glove.840B.300d-char.txt
 
 # Download fasttext
 # FASTTEXT_DIR=./data/fasttext
@@ -28,4 +28,4 @@ unzip $GLOVE_DIR/glove.840B.300d.zip -d $GLOVE_DIR
 # unzip $FASTTEXT_DIR/wiki-news-300d-1M.vec.zip -d $FASTTEXT_DIR
 
 # Download Spacy language models
-python -m spacy download en
+python3 -m spacy download en
