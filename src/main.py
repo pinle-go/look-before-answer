@@ -93,10 +93,6 @@ class Trainer:
             loss = self.train_iter(
                 batch, i + epoch_num * len(self.train_data), version, device
             )
-            if i % 100 == 99:
-                print("saving")
-                self.save(self.config.model_fname)
-
             loss = loss.cpu().detach().numpy()
             print(f"\riteration: {i}/{len(self.train_data)}; loss:{loss}", end="")
             losses.append(loss)
@@ -339,7 +335,6 @@ def main(args, config):
         train(args, config)
     elif args.mode == "test":
         # TODO implement test
-        # TODO implement restart training
 
         utils.makedirs(args.output_folder, raise_error=False)
         test(args, config)

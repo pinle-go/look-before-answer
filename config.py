@@ -51,7 +51,7 @@ config = {
     "batch_size": 32,
     "val_batch_size": 500,
     "learning_rate": 1e-3,
-    "max_epochs": 1,
+    "max_epochs": 100,
     "weight_decay": 3 * 1e-7,
     "lr_warm_up_num": 1e3,
     "grad_clip": 10,
@@ -65,7 +65,7 @@ config = {
     #
     "patience": 5,
     "checkpoint": 900,
-    "save_every": 1,
+    "save_every": 5,
     "model_fname": "model.pt",
 }
 
