@@ -6,7 +6,7 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 home = os.path.expanduser("~")
 data_path = "data/"
-version = "v1.1"  # or "v2.0"
+version = "v2.0"  # or "v2.0"
 raw_data_path = f"{home}/data/squad"
 
 glove_word_file = f"{home}/data/glove/glove.840B.300d.txt"

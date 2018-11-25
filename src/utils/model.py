@@ -1,7 +1,7 @@
 import torch
 from torch.nn import functional as F
 
-from config import config, device
+# TODO review loss functions
 
 
 def loss_origin(p1, p2, y1, y2, z, impossibles):
@@ -159,15 +159,15 @@ def pred_model2(p1, p2, z):
     return ymin, ymax
 
 
-def get_loss_func():
-    if config.data_version == "V2":
-        if config.model_type == "model0":
+def get_loss_func(model_type, version):
+    if version == "v2.0":
+        if model_type == "model0":
             return loss_model0
-        elif config.model_type == "model1":
+        elif model_type == "model1":
             return loss_model1
-        elif config.model_type == "model2":
+        elif model_type == "model2":
             return loss_model2
-        elif config.model_type == "model3":
+        elif model_type == "model3":
             raise NotImplementedError()
         else:
             raise ValueError()
@@ -175,15 +175,15 @@ def get_loss_func():
         return loss_origin
 
 
-def get_pred_func():
-    if config.data_version == "V2":
-        if config.model_type == "model0":
+def get_pred_func(model_type, version):
+    if version == "v2.0":
+        if model_type == "model0":
             return pred_model0
-        elif config.model_type == "model1":
+        elif model_type == "model1":
             return pred_model1
-        elif config.model_type == "model2":
+        elif model_type == "model2":
             return pred_model2
-        elif config.model_type == "model3":
+        elif model_type == "model3":
             raise NotImplementedError()
         else:
             raise ValueError()
@@ -191,17 +191,17 @@ def get_pred_func():
         return pred_origin
 
 
-def get_model_func():
+def get_model_func(model_type, version):
     from models import QANet, QANetV0, QANetV1, QANetV2
 
-    if config.data_version == "V2":
-        if config.model_type == "model0":
+    if version == "v2.0":
+        if model_type == "model0":
             return QANetV0
-        elif config.model_type == "model1":
+        elif model_type == "model1":
             return QANetV1
-        elif config.model_type == "model2":
+        elif model_type == "model2":
             return QANetV2
-        elif config.model_type == "model3":
+        elif model_type == "model3":
             raise NotImplementedError()
         else:
             raise ValueError()
