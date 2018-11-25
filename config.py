@@ -65,7 +65,7 @@ config = {
     #
     "patience": 5,
     "checkpoint": 900,
-    "save_every": 5,
+    "save_every": 1,
     "model_fname": "model.pt",
 }
 

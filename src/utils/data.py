@@ -116,4 +116,3 @@ def convert_tokens(eval_file, qa_id, pp1, pp2, version, zz=None):
             answer_dict[str(qid)] = context[start_idx:end_idx]
             remapped_dict[uuid] = context[start_idx:end_idx]
     return answer_dict, remapped_dict
-

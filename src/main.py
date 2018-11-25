@@ -14,6 +14,7 @@ import json
 import numpy as np
 import torch
 import math
+import shutil
 
 
 class EMA:
@@ -161,7 +162,7 @@ class Trainer:
 
     def train(self):
         best_loss = 10000
-        no_improvement_step = 0  
+        no_improvement_step = 0
         for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
             print(f"Training epoch {i}")
@@ -297,7 +298,7 @@ def evaluate(model, dataset, eval_file, config):
     # eval file is indexed by id so we use id dictionary
     metrics = evaluation.evaluate(eval_file, answer_dict_id, config.version)
     with open(f"{config.answer_file}", "w") as f:
-        json.dump(answer_dict_uuid, f)
+        json.dump(answer_dict_uuid, f, sort_keys=True, indent=4)
 
     metrics["loss"] = loss
     print()
@@ -320,13 +321,150 @@ def evaluate(model, dataset, eval_file, config):
 
 
 def test(args, config):
-    pass
+
+    from preprocess import convert_to_features
+
+    version, device = config.version, config.device
+    print("loading embeddings")
+    with open(config.word_emb_file, "rb") as fh:
+        word_mat = np.array(json.load(fh), dtype=np.float32)
+    with open(config.char_emb_file, "rb") as fh:
+        char_mat = np.array(json.load(fh), dtype=np.float32)
+
+    # create model
+    print("creating model")
+    Model = model_utils.get_model_func(config.model_type, version)
+    pred_func = model_utils.get_pred_func(config.model_type, version)
+
+    model = Model(word_mat, char_mat, config).to(device)
+    model = torch.nn.DataParallel(model)
+
+    print("Loading Model")
+    data = torch.load(args.model_file, map_location="cpu", pickle_module=dill)
+    state_dict = model.state_dict()
+    state_dict.update(data["model"])
+    model.load_state_dict(state_dict)
+
+    with open(args.test_file, "r") as f:
+        test_data = json.load(f)
+    with open(config.word2idx_file) as f:
+        word2idx_dict = json.load(f)
+    with open(config.char2idx_file) as f:
+        char2idx_dict = json.load(f)
+
+    print("Extracting examples")
+    examples = []
+    for article in test_data["data"]:
+        for para in article["paragraphs"]:
+            context = para["context"]
+            for qa in para["qas"]:
+                ques = qa["question"]
+                c_idx, c_char_idx, q_idx, q_char_idx, span = convert_to_features(
+                    config, (context, ques), word2idx_dict, char2idx_dict
+                )
+                uuid = qa["id"]
+                example = {
+                    "context_tokens": c_idx,
+                    "context_chars": c_char_idx,
+                    "ques_tokens": q_idx,
+                    "ques_chars": q_char_idx,
+                    "uuid": uuid,
+                    "span": span,
+                    "context": context,
+                }
+                examples.append(example)
+    N = len(examples)
+    answer_dict = {}
+    with torch.no_grad():
+        for i in range(0, N, config.val_batch_size):
+            print(i)
+            Cwid = np.concatenate(
+                list(
+                    map(
+                        lambda x: np.expand_dims(x["context_tokens"], axis=0),
+                        examples[i : i + config.val_batch_size],
+                    )
+                ),
+                axis=0,
+            )
+            Ccid = np.concatenate(
+                list(
+                    map(
+                        lambda x: np.expand_dims(x["context_chars"],axis=0),
+                        examples[i : i + config.val_batch_size],
+                    )
+                ),
+                axis=0,
+            )
+            Qwid = np.concatenate(
+                list(
+                    map(
+                        lambda x: np.expand_dims(x["ques_tokens"],axis=0),
+                        examples[i : i + config.val_batch_size],
+                    )
+                ),
+                axis=0,
+            )
+            Qcid = np.concatenate(
+                list(
+                    map(
+                        lambda x: np.expand_dims(x["ques_chars"],axis=0),
+                        examples[i : i + config.val_batch_size],
+                    )
+                ),
+                axis=0,
+            )
+
+            Cwid, Ccid, Qwid, Qcid = (
+                torch.tensor(Cwid, device=device).long(),
+                torch.tensor(Ccid, device=device).long(),
+                torch.tensor(Qwid, device=device).long(),
+                torch.tensor(Qcid, device=device).long(),
+            )
+
+            # compute loss and impossible
+            if version == "v2.0":
+                p1, p2, z = model(Cwid, Ccid, Qwid, Qcid)
+            else:
+                p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
+                z = None
+            ymin, ymax = pred_func(p1, p2, z)
+
+            if version == "v2.0":
+                for p1, p2, z, example in zip(
+                    ymin, ymax, z, examples[i : i + config.val_batch_size]
+                ):
+                    uuid, span, context = (
+                        example["uuid"],
+                        example["span"],
+                        example["context"],
+                    )
+                    answer = context[span[p1][0] : span[p2][1]] if z != 1 else ""
+                    answer_dict[uuid] = answer
+            else:
+                for p1, p2, example in zip(
+                    ymin, ymax, examples[i : i + config.val_batch_size]
+                ):
+                    uuid, span, context = (
+                        example["uuid"],
+                        example["span"],
+                        example["context"],
+                    )
+                    answer = context[span[p1][0] : span[p2][1]]
+                    answer_dict[uuid] = answer
+    with open(f"{config.answer_file}", "w") as f:
+        json.dump(answer_dict, f, sort_keys=True, indent=4)
 
 
 def main(args, config):
     if args.mode == "preprocess":
         from preprocess import preprocess
-
+        try:
+            utils.makedirs('data/', raise_error=True)
+        except Exception:
+            print(
+                f"Warning : data folder already exists. Some data may get overwritten"
+            )
         print("Running preprocessing")
         preprocess(args, config)
 
@@ -335,13 +473,22 @@ def main(args, config):
             utils.makedirs(args.output_folder, raise_error=True)
         except Exception:
             print(
-                f"Warning : {args.output_folder} or some of it already exists. Some data may get overwritten"
+                f"Warning : {args.output_folder} already exists. Some data may get overwritten"
             )
+        shutil.copytree("src/", f"{args.output_folder}/src")
+        shutil.copy(args.config_file, args.output_folder)
         train(args, config)
     elif args.mode == "test":
-        # TODO implement test
+        if args.model_file is None or args.test_file is None:
+            print("Error: Provide model_file and test_file file")
+            sys.exit(1)
 
-        utils.makedirs(args.output_folder, raise_error=False)
+        try:
+            utils.makedirs(args.output_folder, raise_error=True)
+        except Exception:
+            print(
+                f"Warning : {args.output_folder} already exists. Some data may get overwritten"
+            )
         test(args, config)
 
 
@@ -353,6 +500,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["train", "test", "preprocess"])
     parser.add_argument("-o", "--output_folder", required=True)
     parser.add_argument("-m", "--model_file")
+    parser.add_argument("-t", "--test_file")
     parser.add_argument(
         "--log-level",
         default="INFO",
