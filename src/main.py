@@ -105,29 +105,37 @@ class Trainer:
                 metrics = evaluate(
                     self.model, self.dev_data, self.dev_eval, self.config
                 )
+                self.ema.resume(self.model)
+                self.model.train()
+                
                 if metrics["loss"] < best_loss:
                     best_loss = metrics["loss"]
                     no_improvement_step = 0
                 else:
                     no_improvement_step += 1
+                print(f"Best loss: {best_loss}, No improvement since: {no_improvement_step}")
 
                 if no_improvement_step >= self.config.patience:
-                    return np.mean(losses), True
+                    return np.mean(losses), True, best_loss, no_improvement_step
 
-                self.ema.resume(self.model)
-                self.model.train()
-
+                
+        self.ema.assign(self.model)
+        self.model.eval()        
         metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
+        self.ema.resume(self.model)
+        self.model.train()
+                
         if metrics["loss"] < best_loss:
             best_loss = metrics["loss"]
             no_improvement_step = 0
         else:
             no_improvement_step += 1
+        print(f"Best loss: {best_loss}, No improvement since: {no_improvement_step}")
 
         if no_improvement_step >= self.config.patience:
             return np.mean(losses), True
 
-        return np.mean(losses), False
+        return np.mean(losses), False, best_loss, no_improvement_step
 
     def train_iter(self, batch, iter, version, device):
         if version == "v2.0":
@@ -166,7 +174,7 @@ class Trainer:
         for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
             print(f"Training epoch {i}")
-            loss, stop = self.train_epoch(i, best_loss, no_improvement_step)
+            loss, stop, best_loss, no_improvement_step = self.train_epoch(i, best_loss, no_improvement_step)
             print(f"epoch: {i}; loss : {loss}")
             if stop:
                 print(
@@ -262,7 +270,6 @@ def evaluate(model, dataset, eval_file, config):
                 Qwid.to(device),
                 Qcid.to(device),
             )
-            # TODO what if there is no y1, y2
             y1, y2 = y1.to(device), y2.to(device)
 
             # compute loss and impossible

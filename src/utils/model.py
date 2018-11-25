@@ -7,6 +7,7 @@ from torch.nn import functional as F
 def loss_origin(p1, p2, y1, y2, z, impossibles):
     p1 = F.log_softmax(p1, dim=1)
     p2 = F.log_softmax(p2, dim=1)
+    # TODO: should have used para limit
     y1[y1 >= 400] = 400
     y2[y2 >= 400] = 400
 
