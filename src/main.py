@@ -277,14 +277,18 @@ def evaluate(model, dataset, eval_file, config):
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
-            answer_dict_id_, answer_dict_uuid_ = data.convert_tokens(
-                eval_file,
-                ids.tolist(),
-                ymin.tolist(),
-                ymax.tolist(),
-                zz=(impossibles.tolist() if version == "v2.0" else None),
-                version=config.version,
-            )
+            try:
+                answer_dict_id_, answer_dict_uuid_ = data.convert_tokens(
+                    eval_file,
+                    ids.tolist(),
+                    ymin.tolist(),
+                    ymax.tolist(),
+                    zz=(impossibles.tolist() if version == "v2.0" else None),
+                    version=config.version,
+                )
+            except Exception as e:
+                import ipdb
+                ipdb.set_trace()
 
             answer_dict_id.update(answer_dict_id_)
             answer_dict_uuid.update(answer_dict_uuid_)
