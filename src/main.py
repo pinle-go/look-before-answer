@@ -157,7 +157,7 @@ class Trainer:
             p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
             z = impossibles = None
 
-        loss = self.loss_func(p1, p2, y1, y2, z, impossibles)
+        loss = self.loss_func(p1, p2, y1, y2, z, impossibles, device=self.config.device)
         loss.backward()
         torch.nn.utils.clip_grad_value_(
             self.model.parameters(), self.config.grad_clip
@@ -280,22 +280,18 @@ def evaluate(model, dataset, eval_file, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = impossibles = None
 
-            loss = loss_func(p1, p2, y1, y2, z, impossibles)
+            loss = loss_func(p1, p2, y1, y2, z, impossibles, device=config.device)
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
-            try:
-                answer_dict_id_, answer_dict_uuid_ = data.convert_tokens(
-                    eval_file,
-                    ids.tolist(),
-                    ymin.tolist(),
-                    ymax.tolist(),
-                    version=config.version,
-                )
-            except Exception as e:
-                import ipdb
-                ipdb.set_trace()
-
+            answer_dict_id_, answer_dict_uuid_ = data.convert_tokens(
+                eval_file,
+                ids.tolist(),
+                ymin.tolist(),
+                ymax.tolist(),
+                version=config.version,
+            )
+            
             answer_dict_id.update(answer_dict_id_)
             answer_dict_uuid.update(answer_dict_uuid_)
 

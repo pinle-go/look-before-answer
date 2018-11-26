@@ -4,7 +4,7 @@ from torch.nn import functional as F
 # TODO review loss functions
 
 
-def loss_origin(p1, p2, y1, y2, z, impossibles):
+def loss_origin(p1, p2, y1, y2, z, impossibles, **kwargs):
     p1 = F.log_softmax(p1, dim=1)
     p2 = F.log_softmax(p2, dim=1)
     # TODO: should have used para limit
@@ -17,7 +17,7 @@ def loss_origin(p1, p2, y1, y2, z, impossibles):
     return loss
 
 
-def loss_model0(p1, p2, y1, y2, z, impossibles):
+def loss_model0(p1, p2, y1, y2, z, impossibles, **kwargs):
     # in this debug model, we basic ignore all no-answer questions
     p1, p2 = p1[impossibles == 0], p2[impossibles == 0]
     y1, y2 = y1[impossibles == 0], y2[impossibles == 0]
@@ -35,7 +35,7 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
     return loss
 
 
-def loss_model1(p1, p2, y1, y2, z, impossibles):
+def loss_model1(p1, p2, y1, y2, z, impossibles, **kwargs):
     y1[y1 >= 400] = 401
     y2[y2 >= 400] = 401
 
@@ -53,7 +53,8 @@ def loss_model1(p1, p2, y1, y2, z, impossibles):
     return loss
 
 
-def loss_model2(p1, p2, y1, y2, z, impossibles):
+def loss_model2(p1, p2, y1, y2, z, impossibles, **kwargs):
+    device = kwargs["device"]
     sa_max, _ = torch.max(p1, dim=1)
     sb_max, _ = torch.max(p2, dim=1)
     sa, sb = p1 - sa_max.unsqueeze(1), p2 - sb_max.unsqueeze(1)
@@ -69,8 +70,10 @@ def loss_model2(p1, p2, y1, y2, z, impossibles):
     for i in range(N):
         exp_sa_, exp_sb_, exp_z_ = exp_sa[i], exp_sb[i], exp_z[i, 0]
         y1_, y2_ = y1[i], y2[i]
-
-        if impossibles[i] == 0:
+        if y1_ >= 400 or y2_ >= 400:
+            # ignore loss calculation
+            continue
+        elif impossibles[i] == 0:
             loss += -torch.log(exp_sa_[y1_] * exp_sb_[y2_])
         else:
             loss += -torch.log(exp_z_)
@@ -114,6 +117,8 @@ def pred_model0(p1, p2, z):
 
 def pred_model1(p1, p2, z):
     ymin, ymax = [], []
+    p1 = F.softmax(p1, dim=1)
+    p2 = F.softmax(p2, dim=1)
 
     for p1_, p2_ in zip(p1, p2):
         outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))

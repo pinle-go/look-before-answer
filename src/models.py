@@ -561,73 +561,30 @@ class QANetV2(QANet):
         super().__init__(word_mat, char_mat, config)
         # start with all zero weights!
         # attention vector for z
-        self.z_attn_w = torch.nn.Parameter(data=torch.zeros(config.enc_filters * 3, 1))
-        self.out_z = nn.Linear(D * 7, 1)
+        self.z_attn_w = Initialized_Conv1d(config.enc_filters * 3, 1)
+        self.out_z = nn.Linear(config.enc_filters * 7, 1)
 
     def forward(self, Cwid, Ccid, Qwid, Qcid):
-        # compute masks first
-        maskC = (torch.zeros_like(Cwid) != Cwid).float()
-        maskQ = (torch.zeros_like(Qwid) != Qwid).float()
+        result = self._forward(Cwid, Ccid, Qwid, Qcid)
+        p1 = result["start"]
+        p2 = result["end"]
+        M1, M2, M3 = result["M1"], result["M2"], result["M3"]
+        mask_C = result["mask_C"]
 
-        # compute embeddings
-        # word embeddings are 300 dim
-        # char embeddings are 16 (chars) x64 dim
-        Cw, Cc = self.word_emb(Cwid), self.char_emb(Ccid)
-        Qw, Qc = self.word_emb(Qwid), self.char_emb(Qcid)
-
-        # combine char and word  embeddings
-        # output is 96 dim vector for each word in ques/para
-        # C = [96X400], Q = [96X50]
-        C, Q = self.emb(Cc, Cw, Lc), self.emb(Qc, Qw, Lq)
-
-        # embeddings encoder
-        # output is same size as input
-        Ce = self.emb_enc(C, maskC, 1, 1)
-        Qe = self.emb_enc(Q, maskQ, 1, 1)
-
-        # Context query attention
-        X = self.cq_att(Ce, Qe, maskC, maskQ)
-
-        # convolution resizer?
-        # M0 = [96X400]
-        M0 = self.cq_resizer(X)
-
-        M0 = F.dropout(M0, p=dropout, training=self.training)
-
-        # pass through encoder blocks
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M1 = M0
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M2 = M0
-        M0 = F.dropout(M0, p=dropout, training=self.training)
-        for i, blk in enumerate(self.model_enc_blks):
-            M0 = blk(M0, maskC, i * (2 + 2) + 1, 7)
-        M3 = M0
-
-        # use M1,M2 for start prob
-        # use M1,M3 for end prob
-        p1, p2 = self.out(M1, M2, M3, maskC)
-
-        # calculate z
+        # X1, X2 are used to calculate p1, p2
         X1 = torch.cat([M1, M2], dim=1)
         X2 = torch.cat([M1, M3], dim=1)
         X3 = torch.cat([M1, M2, M3], dim=1)
+        
+        p3 = mask_logits(self.z_attn_w(X3).squeeze(), mask_C)
 
         p1_ = F.softmax(p1, dim=1)
         p2_ = F.softmax(p2, dim=1)
-        # compute attention dot(w, X3)
-        # for lack of better way I am using the obfuscated way
-
-        p3 = torch.sum(X3 * self.z_attn_w.unsqueeze(0), dim=1)
-        p3 = mask_logits(p3, maskC)
         p3_ = F.softmax(p3, dim=1)
-
+        
         X1 = torch.sum(p1_.unsqueeze(1) * X1, dim=2)
         X2 = torch.sum(p2_.unsqueeze(1) * X2, dim=2)
         X3 = torch.sum(p3_.unsqueeze(1) * X3, dim=2)
-
+        
         z = self.out_z(torch.cat([X1, X2, X3], dim=1))
-
         return p1, p2, z

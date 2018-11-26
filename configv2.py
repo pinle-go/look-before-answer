@@ -16,7 +16,7 @@ config = {
     "device": device,
     #
     "version": version,
-    "model_type": "model1",
+    "model_type": "model2",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
     "raw_dev_file": f"{raw_data_path}/dev-{version}.json",
