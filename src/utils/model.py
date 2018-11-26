@@ -36,19 +36,18 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
 
 
 def loss_model1(p1, p2, y1, y2, z, impossibles):
-    Lc = p1.size(1) - 1
-    y1[y1 == -1] = Lc
-    y2[y2 == -1] = Lc
+    y1[y1 >= 400] = 401
+    y2[y2 >= 400] = 401
+
+    # 400th index is for no-answer
+    y1[impossibles == 1] = 400
+    y2[impossibles == 1] = 400
+
     p1 = F.log_softmax(p1, dim=1)
     p2 = F.log_softmax(p2, dim=1)
 
-    try:
-        loss1 = F.nll_loss(p1, y1)
-        loss2 = F.nll_loss(p2, y2)
-    except:
-        from IPython import embed
-
-        embed()
+    loss1 = F.nll_loss(p1, y1, ignore_index=401)
+    loss2 = F.nll_loss(p2, y2, ignore_index=401)
     loss = loss1 + loss2
 
     return loss
