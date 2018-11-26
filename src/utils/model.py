@@ -24,8 +24,13 @@ def loss_model0(p1, p2, y1, y2, z, impossibles):
 
     p1 = F.log_softmax(p1, dim=1)
     p2 = F.log_softmax(p2, dim=1)
-    loss1 = F.nll_loss(p1, y1)
-    loss2 = F.nll_loss(p2, y2)
+
+    # TODO: should have used para limit
+    y1[y1 >= 400] = 400
+    y2[y2 >= 400] = 400
+
+    loss1 = F.nll_loss(p1, y1, ignore_index=400)
+    loss2 = F.nll_loss(p2, y2, ignore_index=400)
     loss = loss1 + loss2
     return loss
 

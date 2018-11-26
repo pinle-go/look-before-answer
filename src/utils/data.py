@@ -89,13 +89,13 @@ def get_loader(npz_file, batch_size, version):
     return data_loader
 
 
-def convert_tokens(eval_file, qa_id, pp1, pp2, version, zz=None):
+def convert_tokens(eval_file, qa_id, pp1, pp2, version):
 
     answer_dict = {}
     remapped_dict = {}
     if version == "v2.0":
-        for qid, p1, p2, z in zip(qa_id, pp1, pp2, zz):
-            if float(z) == 1:
+        for qid, p1, p2 in zip(qa_id, pp1, pp2):
+            if p1 == -1 and p2 == 1:
                 answer_dict[str(qid)] = ""
                 remapped_dict[str(qid)] = ""
             else:

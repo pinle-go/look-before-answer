@@ -290,7 +290,6 @@ def evaluate(model, dataset, eval_file, config):
                     ids.tolist(),
                     ymin.tolist(),
                     ymax.tolist(),
-                    zz=(impossibles.tolist() if version == "v2.0" else None),
                     version=config.version,
                 )
             except Exception as e:
@@ -440,17 +439,20 @@ def test(args, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = None
             ymin, ymax = pred_func(p1, p2, z)
-
+            
             if version == "v2.0":
-                for p1, p2, z, example in zip(
-                    ymin, ymax, z, examples[i : i + config.val_batch_size]
+                for p1, p2, example in zip(
+                    ymin, ymax, examples[i : i + config.val_batch_size]
                 ):
                     uuid, span, context = (
                         example["uuid"],
                         example["span"],
                         example["context"],
                     )
-                    answer = context[span[p1][0] : span[p2][1]] if z != 1 else ""
+                    if (p1==-1 and p2==-1):
+                        answer = ""
+                    else:
+                        answer = context[span[p1][0] : span[p2][1]] 
                     answer_dict[uuid] = answer
             else:
                 for p1, p2, example in zip(
