@@ -572,19 +572,26 @@ class QANetV2(QANet):
         mask_C = result["mask_C"]
 
         # X1, X2 are used to calculate p1, p2
-        X1 = torch.cat([M1, M2], dim=1)
-        X2 = torch.cat([M1, M3], dim=1)
-        X3 = torch.cat([M1, M2, M3], dim=1)
-        
+        X1 = F.relu(torch.cat([M1, M2], dim=1))
+        X2 = F.relu(torch.cat([M1, M3], dim=1))
+        X3 = F.relu(torch.cat([M1, M2, M3], dim=1))
+
+        X3 = F.dropout(X3, p=self.config.dropout, training=self.training)
         p3 = mask_logits(self.z_attn_w(X3).squeeze(), mask_C)
 
         p1_ = F.softmax(p1, dim=1)
         p2_ = F.softmax(p2, dim=1)
         p3_ = F.softmax(p3, dim=1)
-        
+
         X1 = torch.sum(p1_.unsqueeze(1) * X1, dim=2)
         X2 = torch.sum(p2_.unsqueeze(1) * X2, dim=2)
         X3 = torch.sum(p3_.unsqueeze(1) * X3, dim=2)
-        
-        z = self.out_z(torch.cat([X1, X2, X3], dim=1))
+
+        z = self.out_z(
+            F.dropout(
+                F.relu(torch.cat([X1, X2, X3], dim=1)),
+                p=self.config.dropout,
+                training=self.training,
+            )
+        )
         return p1, p2, z

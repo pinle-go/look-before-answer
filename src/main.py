@@ -107,24 +107,25 @@ class Trainer:
                 )
                 self.ema.resume(self.model)
                 self.model.train()
-                
+
                 if metrics["loss"] < best_loss:
                     best_loss = metrics["loss"]
                     no_improvement_step = 0
                 else:
                     no_improvement_step += 1
-                print(f"Best loss: {best_loss}, No improvement since: {no_improvement_step}")
+                print(
+                    f"Best loss: {best_loss}, No improvement since: {no_improvement_step}"
+                )
 
                 if no_improvement_step >= self.config.patience:
                     return np.mean(losses), True, best_loss, no_improvement_step
 
-                
         self.ema.assign(self.model)
-        self.model.eval()        
+        self.model.eval()
         metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
         self.ema.resume(self.model)
         self.model.train()
-                
+
         if metrics["loss"] < best_loss:
             best_loss = metrics["loss"]
             no_improvement_step = 0
@@ -159,9 +160,7 @@ class Trainer:
 
         loss = self.loss_func(p1, p2, y1, y2, z, impossibles, device=self.config.device)
         loss.backward()
-        torch.nn.utils.clip_grad_value_(
-            self.model.parameters(), self.config.grad_clip
-        )
+        torch.nn.utils.clip_grad_value_(self.model.parameters(), self.config.grad_clip)
         self.optimizer.step()
         self.scheduler.step()
         self.optimizer.zero_grad()
@@ -174,7 +173,9 @@ class Trainer:
         for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
             print(f"Training epoch {i}")
-            loss, stop, best_loss, no_improvement_step = self.train_epoch(i, best_loss, no_improvement_step)
+            loss, stop, best_loss, no_improvement_step = self.train_epoch(
+                i, best_loss, no_improvement_step
+            )
             print(f"epoch: {i}; loss : {loss}")
             if stop:
                 print(
@@ -291,7 +292,7 @@ def evaluate(model, dataset, eval_file, config):
                 ymax.tolist(),
                 version=config.version,
             )
-            
+
             answer_dict_id.update(answer_dict_id_)
             answer_dict_uuid.update(answer_dict_uuid_)
 
@@ -396,7 +397,7 @@ def test(args, config):
             Ccid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["context_chars"],axis=0),
+                        lambda x: np.expand_dims(x["context_chars"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -405,7 +406,7 @@ def test(args, config):
             Qwid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["ques_tokens"],axis=0),
+                        lambda x: np.expand_dims(x["ques_tokens"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -414,7 +415,7 @@ def test(args, config):
             Qcid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["ques_chars"],axis=0),
+                        lambda x: np.expand_dims(x["ques_chars"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -435,7 +436,7 @@ def test(args, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = None
             ymin, ymax = pred_func(p1, p2, z)
-            
+
             if version == "v2.0":
                 for p1, p2, example in zip(
                     ymin, ymax, examples[i : i + config.val_batch_size]
@@ -445,10 +446,10 @@ def test(args, config):
                         example["span"],
                         example["context"],
                     )
-                    if (p1==-1 and p2==-1):
+                    if p1 == -1 and p2 == -1:
                         answer = ""
                     else:
-                        answer = context[span[p1][0] : span[p2][1]] 
+                        answer = context[span[p1][0] : span[p2][1]]
                     answer_dict[uuid] = answer
             else:
                 for p1, p2, example in zip(
@@ -468,8 +469,9 @@ def test(args, config):
 def main(args, config):
     if args.mode == "preprocess":
         from preprocess import preprocess
+
         try:
-            utils.makedirs('data/', raise_error=True)
+            utils.makedirs("data/", raise_error=True)
         except Exception:
             print(
                 f"Warning : data folder already exists. Some data may get overwritten"

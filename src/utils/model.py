@@ -54,29 +54,33 @@ def loss_model1(p1, p2, y1, y2, z, impossibles, **kwargs):
 
 
 def loss_model2(p1, p2, y1, y2, z, impossibles, **kwargs):
-    device = kwargs["device"]
     sa_max, _ = torch.max(p1, dim=1)
     sb_max, _ = torch.max(p2, dim=1)
-    sa, sb = p1 - sa_max.unsqueeze(1), p2 - sb_max.unsqueeze(1)
+    sa_max = sa_max.view(-1, 1)
+    sb_max = sb_max.view(-1, 1)
+
+    max_, _ = torch.max(torch.cat([sa_max, sb_max, z], dim=1), dim=1)
+    sa, sb, z = p1 - max_.unsqueeze(1), p2 - max_.unsqueeze(1), z - max_.unsqueeze(1)
 
     exp_sa, exp_sb, exp_z = torch.exp(sa), torch.exp(sb), torch.exp(z)
     normalizer = exp_z + (torch.sum(exp_sa, dim=1) * torch.sum(exp_sb, dim=1)).view(
         -1, 1
     )
-    exp_sa, exp_sb, exp_z = exp_sa / normalizer, exp_sb / normalizer, exp_z / normalizer
+    # exp_sa, exp_sb, exp_z = exp_sa / normalizer, exp_sb / normalizer, exp_z / normalizer
 
     N = p1.shape[0]
-    loss = torch.tensor(0.0).to(device)
+    loss = torch.tensor(0.0).to(p1.device)
     for i in range(N):
-        exp_sa_, exp_sb_, exp_z_ = exp_sa[i], exp_sb[i], exp_z[i, 0]
+        sa_, sb_, z_, norm_ = (sa[i], sb[i], z[i, 0], normalizer[i, 0])
         y1_, y2_ = y1[i], y2[i]
+
         if y1_ >= 400 or y2_ >= 400:
             # ignore loss calculation
             continue
         elif impossibles[i] == 0:
-            loss += -torch.log(exp_sa_[y1_] * exp_sb_[y2_])
+            loss += -sa_[y1_] - sb_[y2_] + torch.log(norm_)
         else:
-            loss += -torch.log(exp_z_)
+            loss += -z_ + torch.log(norm_)
 
     return loss / N
 
@@ -142,19 +146,30 @@ def pred_model1(p1, p2, z):
 def pred_model2(p1, p2, z):
     sa_max, _ = torch.max(p1, dim=1)
     sb_max, _ = torch.max(p2, dim=1)
-    sa, sb = p1 - sa_max.unsqueeze(1), p2 - sb_max.unsqueeze(1)
+    sa_max = sa_max.view(-1, 1)
+    sb_max = sb_max.view(-1, 1)
+
+    max_, _ = torch.max(torch.cat([sa_max, sb_max, z], dim=1), dim=1)
+
+    sa, sb, z = p1 - max_.unsqueeze(1), p2 - max_.unsqueeze(1), z - max_.unsqueeze(1)
 
     exp_sa, exp_sb, exp_z = torch.exp(sa), torch.exp(sb), torch.exp(z)
     normalizer = exp_z + (torch.sum(exp_sa, dim=1) * torch.sum(exp_sb, dim=1)).view(
         -1, 1
     )
-    exp_sa, exp_sb, exp_z = exp_sa / normalizer, exp_sb / normalizer, exp_z / normalizer
+    # exp_sa, exp_sb, exp_z = exp_sa / normalizer, exp_sb / normalizer, exp_z / normalizer
 
     N = p1.shape[0]
     ymin, ymax = [], []
 
     for i in range(N):
-        exp_sa_, exp_sb_, exp_z_ = exp_sa[i], exp_sb[i], exp_z[i, 0]
+        exp_sa_, exp_sb_, exp_z_, norm_ = (
+            exp_sa[i],
+            exp_sb[i],
+            exp_z[i, 0],
+            normalizer[i, 0],
+        )
+        # Note : we are not dividing by norm, divide by norm_ to get the normalized prob
         outer = torch.matmul(exp_sa_.unsqueeze(1), exp_sb_.unsqueeze(0))
         outer = torch.triu(outer)
         a1, _ = torch.max(outer, dim=1)
