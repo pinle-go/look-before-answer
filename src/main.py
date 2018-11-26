@@ -142,30 +142,30 @@ class Trainer:
             Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles = batch
         else:
             Cwid, Ccid, Qwid, Qcid, y1, y2, ids = batch
-            Cwid, Ccid, Qwid, Qcid = (
-                Cwid.to(device),
-                Ccid.to(device),
-                Qwid.to(device),
-                Qcid.to(device),
-            )
-            y1, y2 = y1.to(device), y2.to(device)
+        Cwid, Ccid, Qwid, Qcid = (
+            Cwid.to(device),
+            Ccid.to(device),
+            Qwid.to(device),
+            Qcid.to(device),
+        )
+        y1, y2 = y1.to(device), y2.to(device)
 
-            if version == "v2.0":
-                p1, p2, z = self.model(Cwid, Ccid, Qwid, Qcid)
-                impossibles = impossibles.to(device)
-            else:
-                p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
-                z = impossibles = None
+        if version == "v2.0":
+            p1, p2, z = self.model(Cwid, Ccid, Qwid, Qcid)
+            impossibles = impossibles.to(device)
+        else:
+            p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
+            z = impossibles = None
 
-            loss = self.loss_func(p1, p2, y1, y2, z, impossibles)
-            loss.backward()
-            torch.nn.utils.clip_grad_value_(
-                self.model.parameters(), self.config.grad_clip
-            )
-            self.optimizer.step()
-            self.scheduler.step()
-            self.optimizer.zero_grad()
-            self.ema(self.model, iter)
+        loss = self.loss_func(p1, p2, y1, y2, z, impossibles)
+        loss.backward()
+        torch.nn.utils.clip_grad_value_(
+            self.model.parameters(), self.config.grad_clip
+        )
+        self.optimizer.step()
+        self.scheduler.step()
+        self.optimizer.zero_grad()
+        self.ema(self.model, iter)
         return loss
 
     def train(self):
