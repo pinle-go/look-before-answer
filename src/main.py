@@ -185,6 +185,11 @@ class Trainer:
             if (i + 1) % self.config.save_every and i:
                 self.save(self.config.model_fname)
         self.save(self.config.model_fname)
+        metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
+
+        print(f"Final results F1: {metrics.get('f1')}")
+        print(f"Exact Match: {metrics.get('exact_match')}")
+        print(f"Answerability {metrics.get('answerability_acc')}")
 
     def save(self, fname):
         data = {}
@@ -384,7 +389,7 @@ def test(args, config):
     answer_dict = {}
     with torch.no_grad():
         for i in range(0, N, config.val_batch_size):
-            print(i)
+            print(f"\r current index {i}/{N}", end="")
             Cwid = np.concatenate(
                 list(
                     map(
@@ -489,6 +494,7 @@ def main(args, config):
         shutil.copytree("src/", f"{args.output_folder}/src")
         shutil.copy(args.config_file, args.output_folder)
         train(args, config)
+
     elif args.mode == "test":
         if args.model_file is None or args.test_file is None:
             print("Error: Provide model_file and test_file file")
