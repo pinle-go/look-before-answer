@@ -16,7 +16,7 @@ config = {
     "device": device,
     #
     "version": version,
-    "model_type": "model2",
+    "model_type": "model3",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
     "raw_dev_file": f"{raw_data_path}/dev-{version}.json",
@@ -63,6 +63,7 @@ config = {
     "enc_filters": 128,
     "attention_heads": 1,
     #
+    "loss_coeff": 5,
     "patience": 5,
     "checkpoint": 1000,
     "save_every": 1,

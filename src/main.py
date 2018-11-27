@@ -158,7 +158,7 @@ class Trainer:
             p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
             z = impossibles = None
 
-        loss = self.loss_func(p1, p2, y1, y2, z, impossibles, device=self.config.device)
+        loss = self.loss_func(p1, p2, y1, y2, z, impossibles, coeff=self.config.loss_coeff)
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.model.parameters(), self.config.grad_clip)
         self.optimizer.step()
@@ -286,7 +286,7 @@ def evaluate(model, dataset, eval_file, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = impossibles = None
 
-            loss = loss_func(p1, p2, y1, y2, z, impossibles, device=config.device)
+            loss = loss_func(p1, p2, y1, y2, z, impossibles, coeff=config.loss_coeff)
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
@@ -491,7 +491,10 @@ def main(args, config):
             print(
                 f"Warning : {args.output_folder} already exists. Some data may get overwritten"
             )
+        shutil.rmtree(f"{args.output_folder}/src", ignore_errors=True)
         shutil.copytree("src/", f"{args.output_folder}/src")
+        
+        
         shutil.copy(args.config_file, args.output_folder)
         train(args, config)
 

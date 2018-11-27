@@ -85,6 +85,29 @@ def loss_model2(p1, p2, y1, y2, z, impossibles, **kwargs):
     return loss / N
 
 
+def loss_model3(p1, p2, y1, y2, z, impossible, **kwargs):
+    y1[y1 >= 400] = 400
+    y2[y2 >= 400] = 400
+
+    y1[y1 == -1] = 400
+    y2[y2 == -1] = 400
+
+    coeff = kwargs["coeff"]
+
+    p1 = F.log_softmax(p1, dim=1)
+    p2 = F.log_softmax(p2, dim=1)
+
+    loss1 = F.nll_loss(p1, y1, ignore_index=400)
+    loss2 = F.nll_loss(p2, y2, ignore_index=400)
+    span_prediction_loss = loss1 + loss2
+
+    answer_prediction_loss = F.binary_cross_entropy_with_logits(
+        z, impossible.view(z.shape).float()
+    )
+    loss = span_prediction_loss * coeff + answer_prediction_loss
+    return loss
+
+
 def pred_origin(p1, p2, z):
     p1 = F.softmax(p1, dim=1)
     p2 = F.softmax(p2, dim=1)
@@ -187,6 +210,30 @@ def pred_model2(p1, p2, z):
     return ymin, ymax
 
 
+def pred_model3(p1, p2, z):
+    ymin, ymax = [], []
+    p1 = F.softmax(p1, dim=1)
+    p2 = F.softmax(p2, dim=1)
+    z = torch.sigmoid(z)
+
+    for p1_, p2_, z_ in zip(p1, p2, z):
+        outer = torch.matmul(p1_.unsqueeze(1), p2_.unsqueeze(0))
+        outer = torch.triu(outer)
+        # since we have binary classification loss on z we can compare to a fixed value
+        if z_ < 0.5:
+            a1, _ = torch.max(outer, dim=1)
+            a2, _ = torch.max(outer, dim=0)
+            ymin_ = torch.argmax(a1, dim=0)
+            ymax_ = torch.argmax(a2, dim=0)
+        else:
+            ymin_ = -1
+            ymax_ = -1
+        ymin.append(ymin_)
+        ymax.append(ymax_)
+    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
+    return ymin, ymax
+
+
 def get_loss_func(model_type, version):
     if version == "v2.0":
         if model_type == "model0":
@@ -196,7 +243,7 @@ def get_loss_func(model_type, version):
         elif model_type == "model2":
             return loss_model2
         elif model_type == "model3":
-            raise NotImplementedError()
+            return loss_model3
         else:
             raise ValueError()
     else:
@@ -212,7 +259,7 @@ def get_pred_func(model_type, version):
         elif model_type == "model2":
             return pred_model2
         elif model_type == "model3":
-            raise NotImplementedError()
+            return pred_model3
         else:
             raise ValueError()
     else:
@@ -230,7 +277,7 @@ def get_model_func(model_type, version):
         elif model_type == "model2":
             return QANetV2
         elif model_type == "model3":
-            raise NotImplementedError()
+            return QANetV2
         else:
             raise ValueError()
     else:
