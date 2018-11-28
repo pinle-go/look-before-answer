@@ -311,7 +311,7 @@ def build_features(
     version = config.version
 
     print(f"Processing {data_type} examples...")
-    total=0
+    total = 0
     meta = {}
     N = len(examples)
     context_idxs = []
@@ -329,7 +329,7 @@ def build_features(
         # if filter returns true, then move to next example
         if filter_func(example, is_test):
             continue
-        total+=1
+        total += 1
         context_idx = np.zeros([para_limit], dtype=np.int32)
         context_char_idx = np.zeros([para_limit, char_limit], dtype=np.int32)
         ques_idx = np.zeros([ques_limit], dtype=np.int32)
@@ -407,7 +407,7 @@ def build_features(
         )
     print("Built {} / {} instances of features in total".format(len(y1s), N))
     print("Processed {} instances of features in total".format(total))
-    
+
     meta["total"] = len(y1s)
     meta["id_to_uuid"] = id_to_uuid
     return meta

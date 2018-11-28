@@ -105,59 +105,66 @@ class Trainer:
                 metrics = evaluate(
                     self.model, self.dev_data, self.dev_eval, self.config
                 )
+                self.ema.resume(self.model)
+                self.model.train()
+
                 if metrics["loss"] < best_loss:
                     best_loss = metrics["loss"]
                     no_improvement_step = 0
                 else:
                     no_improvement_step += 1
+                print(
+                    f"Best loss: {best_loss}, No improvement since: {no_improvement_step}"
+                )
 
                 if no_improvement_step >= self.config.patience:
-                    return np.mean(losses), True
+                    return np.mean(losses), True, best_loss, no_improvement_step
 
-                self.ema.resume(self.model)
-                self.model.train()
-
+        self.ema.assign(self.model)
+        self.model.eval()
         metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
+        self.ema.resume(self.model)
+        self.model.train()
+
         if metrics["loss"] < best_loss:
             best_loss = metrics["loss"]
             no_improvement_step = 0
         else:
             no_improvement_step += 1
+        print(f"Best loss: {best_loss}, No improvement since: {no_improvement_step}")
 
         if no_improvement_step >= self.config.patience:
             return np.mean(losses), True
 
-        return np.mean(losses), False
+        return np.mean(losses), False, best_loss, no_improvement_step
 
     def train_iter(self, batch, iter, version, device):
         if version == "v2.0":
             Cwid, Ccid, Qwid, Qcid, y1, y2, ids, impossibles = batch
         else:
             Cwid, Ccid, Qwid, Qcid, y1, y2, ids = batch
-            Cwid, Ccid, Qwid, Qcid = (
-                Cwid.to(device),
-                Ccid.to(device),
-                Qwid.to(device),
-                Qcid.to(device),
-            )
-            y1, y2 = y1.to(device), y2.to(device)
+        Cwid, Ccid, Qwid, Qcid = (
+            Cwid.to(device),
+            Ccid.to(device),
+            Qwid.to(device),
+            Qcid.to(device),
+        )
+        y1, y2 = y1.to(device), y2.to(device)
 
-            if version == "v2.0":
-                p1, p2, z = self.model(Cwid, Ccid, Qwid, Qcid)
-                impossibles = impossibles.to(device)
-            else:
-                p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
-                z = impossibles = None
+        if version == "v2.0":
+            p1, p2, z = self.model(Cwid, Ccid, Qwid, Qcid)
+            impossibles = impossibles.to(device)
+        else:
+            p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
+            z = impossibles = None
 
-            loss = self.loss_func(p1, p2, y1, y2, z, impossibles)
-            loss.backward()
-            torch.nn.utils.clip_grad_value_(
-                self.model.parameters(), self.config.grad_clip
-            )
-            self.optimizer.step()
-            self.scheduler.step()
-            self.optimizer.zero_grad()
-            self.ema(self.model, iter)
+        loss = self.loss_func(p1, p2, y1, y2, z, impossibles, coeff=self.config.loss_coeff)
+        loss.backward()
+        torch.nn.utils.clip_grad_value_(self.model.parameters(), self.config.grad_clip)
+        self.optimizer.step()
+        self.scheduler.step()
+        self.optimizer.zero_grad()
+        self.ema(self.model, iter)
         return loss
 
     def train(self):
@@ -166,7 +173,9 @@ class Trainer:
         for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
             print(f"Training epoch {i}")
-            loss, stop = self.train_epoch(i, best_loss, no_improvement_step)
+            loss, stop, best_loss, no_improvement_step = self.train_epoch(
+                i, best_loss, no_improvement_step
+            )
             print(f"epoch: {i}; loss : {loss}")
             if stop:
                 print(
@@ -176,6 +185,11 @@ class Trainer:
             if (i + 1) % self.config.save_every and i:
                 self.save(self.config.model_fname)
         self.save(self.config.model_fname)
+        metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
+
+        print(f"Final results F1: {metrics.get('f1')}")
+        print(f"Exact Match: {metrics.get('exact_match')}")
+        print(f"Answerability {metrics.get('answerability_acc')}")
 
     def save(self, fname):
         data = {}
@@ -262,7 +276,6 @@ def evaluate(model, dataset, eval_file, config):
                 Qwid.to(device),
                 Qcid.to(device),
             )
-            # TODO what if there is no y1, y2
             y1, y2 = y1.to(device), y2.to(device)
 
             # compute loss and impossible
@@ -273,7 +286,7 @@ def evaluate(model, dataset, eval_file, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = impossibles = None
 
-            loss = loss_func(p1, p2, y1, y2, z, impossibles)
+            loss = loss_func(p1, p2, y1, y2, z, impossibles, coeff=config.loss_coeff)
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
@@ -282,7 +295,6 @@ def evaluate(model, dataset, eval_file, config):
                 ids.tolist(),
                 ymin.tolist(),
                 ymax.tolist(),
-                zz=(impossibles.tolist() if version == "v2.0" else None),
                 version=config.version,
             )
 
@@ -377,7 +389,7 @@ def test(args, config):
     answer_dict = {}
     with torch.no_grad():
         for i in range(0, N, config.val_batch_size):
-            print(i)
+            print(f"\r current index {i}/{N}", end="")
             Cwid = np.concatenate(
                 list(
                     map(
@@ -390,7 +402,7 @@ def test(args, config):
             Ccid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["context_chars"],axis=0),
+                        lambda x: np.expand_dims(x["context_chars"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -399,7 +411,7 @@ def test(args, config):
             Qwid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["ques_tokens"],axis=0),
+                        lambda x: np.expand_dims(x["ques_tokens"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -408,7 +420,7 @@ def test(args, config):
             Qcid = np.concatenate(
                 list(
                     map(
-                        lambda x: np.expand_dims(x["ques_chars"],axis=0),
+                        lambda x: np.expand_dims(x["ques_chars"], axis=0),
                         examples[i : i + config.val_batch_size],
                     )
                 ),
@@ -431,15 +443,18 @@ def test(args, config):
             ymin, ymax = pred_func(p1, p2, z)
 
             if version == "v2.0":
-                for p1, p2, z, example in zip(
-                    ymin, ymax, z, examples[i : i + config.val_batch_size]
+                for p1, p2, example in zip(
+                    ymin, ymax, examples[i : i + config.val_batch_size]
                 ):
                     uuid, span, context = (
                         example["uuid"],
                         example["span"],
                         example["context"],
                     )
-                    answer = context[span[p1][0] : span[p2][1]] if z != 1 else ""
+                    if p1 == -1 and p2 == -1:
+                        answer = ""
+                    else:
+                        answer = context[span[p1][0] : span[p2][1]]
                     answer_dict[uuid] = answer
             else:
                 for p1, p2, example in zip(
@@ -459,8 +474,9 @@ def test(args, config):
 def main(args, config):
     if args.mode == "preprocess":
         from preprocess import preprocess
+
         try:
-            utils.makedirs('data/', raise_error=True)
+            utils.makedirs("data/", raise_error=True)
         except Exception:
             print(
                 f"Warning : data folder already exists. Some data may get overwritten"
@@ -475,9 +491,13 @@ def main(args, config):
             print(
                 f"Warning : {args.output_folder} already exists. Some data may get overwritten"
             )
+        shutil.rmtree(f"{args.output_folder}/src", ignore_errors=True)
         shutil.copytree("src/", f"{args.output_folder}/src")
+        
+        
         shutil.copy(args.config_file, args.output_folder)
         train(args, config)
+
     elif args.mode == "test":
         if args.model_file is None or args.test_file is None:
             print("Error: Provide model_file and test_file file")

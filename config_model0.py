@@ -6,7 +6,7 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 home = os.path.expanduser("~")
 data_path = "data/"
-version = "v2.0"  # or "v2.0"
+version = "v1.1"  # or "v2.0"
 raw_data_path = f"{home}/data/squad"
 
 glove_word_file = f"{home}/data/glove/glove.840B.300d.txt"
@@ -15,8 +15,8 @@ glove_char_file = f"{home}/data/glove/glove.840B.300d-char.txt"
 config = {
     "device": device,
     #
-    "version": version,
-    "model_type": "model3",
+    "version": "v2.0",  # keep this as 2.0, load everything of 1.1 though
+    "model_type": "model0",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
     "raw_dev_file": f"{raw_data_path}/dev-{version}.json",
@@ -63,9 +63,8 @@ config = {
     "enc_filters": 128,
     "attention_heads": 1,
     #
-    "loss_coeff": 5,
     "patience": 5,
-    "checkpoint": 1000,
+    "checkpoint": 900,
     "save_every": 1,
     "model_fname": "model.pt",
 }
