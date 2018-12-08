@@ -9,8 +9,8 @@ class SQuADDataset(Dataset):
         self.version = version
 
         idx = np.arange(len(data["y1s"]))
-        np.random.seed(0)
-        np.random.shuffle(idx)
+        # np.random.seed(0)
+        # np.random.shuffle(idx)
 
         self.context_idxs = data["context_idxs"][idx]
         self.context_char_idxs = data["context_char_idxs"][idx]
