@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.nn import functional as F
 
@@ -106,6 +107,10 @@ def loss_model3(p1, p2, y1, y2, z, impossible, **kwargs):
     )
     loss = span_prediction_loss * s_coeff + answer_prediction_loss * a_coeff
     return loss
+
+
+def loss_model_ao(p1, p2, y1, y2, z, impossible, **kwargs):
+    return F.binary_cross_entropy_with_logits(z, impossible.float())
 
 
 def pred_origin(p1, p2, z):
@@ -234,6 +239,21 @@ def pred_model3(p1, p2, z):
     return ymin, ymax
 
 
+def pred_model_ao(p1, p2, z, **kwargs):
+    ymin, ymax = [], []
+    # import ipdb; ipdb.set_trace()
+    z = z.tolist()
+    for (z_, ) in zip(z):
+        if z_ < 0:
+            ymin.append(0)
+            ymax.append(1)
+        else:
+            ymin.append(-1)
+            ymax.append(-1)
+    ymin, ymax = torch.LongTensor(ymin), torch.LongTensor(ymax)
+    return ymin, ymax
+
+
 def get_loss_func(model_type, version):
     if version == "v2.0":
         if model_type == "model0":
@@ -244,6 +264,8 @@ def get_loss_func(model_type, version):
             return loss_model2
         elif model_type == "model3":
             return loss_model3
+        elif model_type == "model_ao":
+            return loss_model_ao
         else:
             raise ValueError()
     else:
@@ -260,6 +282,8 @@ def get_pred_func(model_type, version):
             return pred_model2
         elif model_type == "model3":
             return pred_model3
+        elif model_type == "model_ao":
+            return pred_model_ao
         else:
             raise ValueError()
     else:
@@ -267,7 +291,7 @@ def get_pred_func(model_type, version):
 
 
 def get_model_func(model_type, version):
-    from models import QANet, QANetV0, QANetV1, QANetV2
+    from models import QANet, QANetV0, QANetV1, QANetV2, QANetAO
 
     if version == "v2.0":
         if model_type == "model0":
@@ -278,6 +302,8 @@ def get_model_func(model_type, version):
             return QANetV2
         elif model_type == "model3":
             return QANetV2
+        elif model_type == "model_ao":
+            return QANetAO
         else:
             raise ValueError()
     else:

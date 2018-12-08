@@ -8,20 +8,25 @@ class SQuADDataset(Dataset):
         data = np.load(npz_file)
         self.version = version
 
-        self.context_idxs = data["context_idxs"]
-        self.context_char_idxs = data["context_char_idxs"]
-        self.ques_idxs = data["ques_idxs"]
-        self.ques_char_idxs = data["ques_char_idxs"]
-        self.y1s = data["y1s"]
-        self.y2s = data["y2s"]
-        self.ids = data["ids"]
-        self.uuids = data["uuids"]
+        idx = np.arange(len(data["y1s"]))
+        np.random.seed(0)
+        np.random.shuffle(idx)
+
+        self.context_idxs = data["context_idxs"][idx]
+        self.context_char_idxs = data["context_char_idxs"][idx]
+        self.ques_idxs = data["ques_idxs"][idx]
+        self.ques_char_idxs = data["ques_char_idxs"][idx]
+        self.y1s = data["y1s"][idx]
+        self.y2s = data["y2s"][idx]
+        self.ids = data["ids"][idx]
+        self.uuids = data["uuids"][idx]
 
         if version == "v2.0":
-            self.impossibles = data["impossibles"].astype(np.int)
+            self.impossibles = data["impossibles"][idx].astype(np.int)
         self.num = len(self.ids)
 
     def __len__(self):
+        # return 1000
         return self.num
 
     def __getitem__(self, idx):
