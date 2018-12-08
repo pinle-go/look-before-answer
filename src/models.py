@@ -1,4 +1,5 @@
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -595,3 +596,81 @@ class QANetV2(QANet):
             )
         )
         return p1, p2, z
+
+
+class QANetAO(nn.Module):
+    def __init__(self, word_mat, char_mat, config):
+        super().__init__()
+        self.config = config
+
+        self.word_emb = WordEmbedding(word_mat, config)
+        self.char_emb = CharEmbedding(char_mat, config)
+
+        # embedding layer
+        self.emb = Embedding(config)
+
+        # embedding encoder block
+        self.emb_enc = EncoderBlock(
+            conv_num=4, ch_num=config.enc_filters, k=7, config=config
+        )
+
+        self.cq_att = CQAttention(config)
+        self.cq_resizer = Initialized_Conv1d(config.enc_filters * 4, config.enc_filters)
+
+        self.fc = nn.Sequential(
+            nn.Linear(config.enc_filters, 10), nn.ReLU(), nn.Linear(10, 1)
+        )
+
+    def forward(self, Cwid, Ccid, Qwid, Qcid):
+        result = self._forward(Cwid, Ccid, Qwid, Qcid)
+
+        z, mask = result["M0"], result["mask_C"]
+        z = (z * mask.unsqueeze(1)).sum(dim=2)
+        z = z / mask.sum(dim=1, keepdim=True)
+        z = self.fc(z).squeeze()
+
+        return torch.zeros_like(z), torch.zeros_like(z), z
+
+    def _forward(self, Cwid, Ccid, Qwid, Qcid):
+        # compute masks first
+        maskC = (torch.zeros_like(Cwid) != Cwid).float()
+        maskQ = (torch.zeros_like(Qwid) != Qwid).float()
+
+        # compute embeddings
+        # word embeddings are 300 dim
+        # char embeddings are 16 (chars) x200 dim
+        Cw, Cc = self.word_emb(Cwid), self.char_emb(Ccid)
+        Qw, Qc = self.word_emb(Qwid), self.char_emb(Qcid)
+
+        C, Q = self.emb(Cc, Cw), self.emb(Qc, Qw)
+
+        # embeddings encoder
+        # output is same size as input
+        Ce = self.emb_enc(C, maskC, 1, 1)
+        Qe = self.emb_enc(Q, maskQ, 1, 1)
+
+        # Context query attention
+        X = self.cq_att(Ce, Qe, maskC, maskQ)
+        M0 = self.cq_resizer(X)
+
+        # pass through encoder blocks
+        # M = F.dropout(M0, p=self.config.dropout, training=self.training)
+        # for i, blk in enumerate(self.model_enc_blks):
+        #     M = blk(M, maskC, i * (2 + 2) + 1, 3)
+        # M1 = M
+
+        return {
+            "start": 0,
+            "end": 0,
+            "M0": M0,
+            "M1": M0,
+            "M2": 0,
+            "M3": 0,
+            "CQ_A": X,
+            "emb_enc_C": Ce,
+            "emb_enc_Q": Qe,
+            "emb_C": C,
+            "emb_Q": Q,
+            "mask_C": maskC,
+            "mask_Q": maskQ,
+        }

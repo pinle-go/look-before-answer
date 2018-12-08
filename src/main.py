@@ -274,7 +274,8 @@ def train(args, config):
     print("creating model")
     Model = model_utils.get_model_func(config.model_type, config.version)
     model = Model(word_mat, char_mat, config).to(config.device)
-    model = torch.nn.DataParallel(model)
+    # model = torch.nn.DataParallel(model)
+    print(model)
 
     print("Training Model")
     trainer = Trainer(model, train_dataset, dev_dataset, dev_eval_file, config)
@@ -356,11 +357,12 @@ def evaluate(model, dataset, eval_file, config):
     print()
     if version == "v2.0":
         print(
-            "EVAL loss {:8f} F1 {:8f} EM {:8f} answer possible {:8f}\n".format(
+            "EVAL loss {:8f} F1 {:8f} EM {:8f} answer possible {:8f} f1 {:8f}\n".format(
                 loss,
                 metrics["f1"],
                 metrics["exact_match"],
                 metrics["answerability_acc"],
+                metrics["answerability_f1"],
             )
         )
     else:
