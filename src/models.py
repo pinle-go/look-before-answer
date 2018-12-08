@@ -674,3 +674,47 @@ class QANetAO(nn.Module):
             "mask_C": maskC,
             "mask_Q": maskQ,
         }
+        
+class QANetV3(QANet):
+    def __init__(self, word_mat, char_mat, config):
+        super().__init__(word_mat, char_mat, config)
+        # start with all zero weights!
+        # attention vector for z
+        self.z_attn_w_m1 = Initialized_Conv1d(config.enc_filters, 1)
+        self.z_attn_w_m2 = Initialized_Conv1d(config.enc_filters, 1)
+        self.z_attn_w_m3 = Initialized_Conv1d(config.enc_filters, 1)
+        self.out_z = nn.Linear(config.enc_filters * 3, 1)
+
+    def forward(self, Cwid, Ccid, Qwid, Qcid):
+        result = self._forward(Cwid, Ccid, Qwid, Qcid)
+        p1 = result["start"]
+        p2 = result["end"]
+        M1, M2, M3 = result["M1"], result["M2"], result["M3"]
+        mask_C = result["mask_C"]
+
+        # use three diff attention for M1, M2 and M3
+        # X1, X2 are used to calculate p1, p2
+        X1 = F.dropout(M1, p=self.config.dropout, training=self.training)
+        p1 = mask_logits(self.z_attn_w_m1(X1).squeeze(), mask_C)
+        X2 = F.dropout(M2, p=self.config.dropout, training=self.training)
+        p2 = mask_logits(self.z_attn_w_m2(X2).squeeze(), mask_C)
+        X3= F.dropout(M3, p=self.config.dropout, training=self.training)
+        p3 = mask_logits(self.z_attn_w_m3(X3).squeeze(), mask_C)
+
+        p1_ = F.softmax(p1, dim=1)
+        p2_ = F.softmax(p2, dim=1)
+        p3_ = F.softmax(p3, dim=1)
+
+        X1 = torch.sum(p1_.unsqueeze(1) * X1, dim=2)
+        X2 = torch.sum(p2_.unsqueeze(1) * X2, dim=2)
+        X3 = torch.sum(p3_.unsqueeze(1) * X3, dim=2)
+
+        z = self.out_z(
+            F.dropout(
+                F.relu(torch.cat([X1, X2, X3], dim=1)),
+                p=self.config.dropout,
+                training=self.training,
+            )
+        )
+        z = z.squeeze()
+        return torch.zeros_like(z), torch.zeros_like(z), z
