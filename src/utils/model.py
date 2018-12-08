@@ -92,7 +92,7 @@ def loss_model3(p1, p2, y1, y2, z, impossible, **kwargs):
     y1[y1 == -1] = 400
     y2[y2 == -1] = 400
 
-    coeff = kwargs["coeff"]
+    a_coeff, s_coeff = kwargs["a_coeff"], kwargs["s_coeff"]
 
     p1 = F.log_softmax(p1, dim=1)
     p2 = F.log_softmax(p2, dim=1)
@@ -104,7 +104,7 @@ def loss_model3(p1, p2, y1, y2, z, impossible, **kwargs):
     answer_prediction_loss = F.binary_cross_entropy_with_logits(
         z, impossible.view(z.shape).float()
     )
-    loss = span_prediction_loss * coeff + answer_prediction_loss
+    loss = span_prediction_loss * s_coeff + answer_prediction_loss * a_coeff
     return loss
 
 

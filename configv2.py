@@ -49,7 +49,7 @@ config = {
     "char_limit": 16,
     #
     "batch_size": 32,
-    "val_batch_size": 500,
+    "val_batch_size": 250,
     "learning_rate": 1e-3,
     "max_epochs": 100,
     "weight_decay": 3 * 1e-7,
@@ -60,10 +60,11 @@ config = {
     "dropout_char": 0.1,
     "dropout_word": 0.05,
     "dropout": 0.1,
-    "enc_filters": 128,
+    "enc_filters": 96,
     "attention_heads": 1,
     #
-    "loss_coeff": 5,
+    "answer_loss_coeff": 0.01,
+    "span_loss_coeff": 1,
     "patience": 5,
     "checkpoint": 1000,
     "save_every": 1,

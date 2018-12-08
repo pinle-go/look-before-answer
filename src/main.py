@@ -107,14 +107,26 @@ class Trainer:
                 )
                 self.ema.resume(self.model)
                 self.model.train()
-
-                if metrics["loss"] < best_loss:
-                    best_loss = metrics["loss"]
+                
+                if (metrics["loss"]<best_loss["loss"]):
+                    best_loss["loss"] = metrics["loss"]
+                
+                if metrics["f1"] > best_loss["F1"]:
+                    best_loss["F1"] = metrics["f1"]
                     no_improvement_step = 0
-                else:
+
+                if metrics["exact_match"] > best_loss["EM"]:
+                    best_loss["EM"] = metrics["exact_match"]
+                    no_improvement_step = 0
+
+                if (
+                    metrics["exact_match"] < best_loss["EM"]
+                    and metrics["f1"] < best_loss["F1"]
+                ):
                     no_improvement_step += 1
+
                 print(
-                    f"Best loss: {best_loss}, No improvement since: {no_improvement_step}"
+                    f"Best loss: F1-{best_loss['F1']}, EM-{best_loss['EM']}, No improvement since: {no_improvement_step}"
                 )
 
                 if no_improvement_step >= self.config.patience:
@@ -126,15 +138,24 @@ class Trainer:
         self.ema.resume(self.model)
         self.model.train()
 
-        if metrics["loss"] < best_loss:
-            best_loss = metrics["loss"]
+        if (metrics["loss"]<best_loss["loss"]):
+            best_loss["loss"] = metrics["loss"]
+                
+        if metrics["f1"] > best_loss["F1"]:
+            best_loss["F1"] = metrics["f1"]
             no_improvement_step = 0
-        else:
+
+        if metrics["exact_match"] > best_loss["EM"]:
+            best_loss["EM"] = metrics["exact_match"]
+            no_improvement_step = 0
+
+        if metrics["exact_match"] < best_loss["EM"] and metrics["f1"] < best_loss["F1"]:
             no_improvement_step += 1
+
         print(f"Best loss: {best_loss}, No improvement since: {no_improvement_step}")
 
         if no_improvement_step >= self.config.patience:
-            return np.mean(losses), True
+            return np.mean(losses), True, best_loss, no_improvement_step
 
         return np.mean(losses), False, best_loss, no_improvement_step
 
@@ -158,7 +179,16 @@ class Trainer:
             p1, p2 = self.model(Cwid, Ccid, Qwid, Qcid)
             z = impossibles = None
 
-        loss = self.loss_func(p1, p2, y1, y2, z, impossibles, coeff=self.config.loss_coeff)
+        loss = self.loss_func(
+            p1,
+            p2,
+            y1,
+            y2,
+            z,
+            impossibles,
+            a_coeff=self.config.answer_loss_coeff,
+            s_coeff=self.config.span_loss_coeff,
+        )
         loss.backward()
         torch.nn.utils.clip_grad_value_(self.model.parameters(), self.config.grad_clip)
         self.optimizer.step()
@@ -168,7 +198,8 @@ class Trainer:
         return loss
 
     def train(self):
-        best_loss = 10000
+        best_loss = {"loss": 10000, "F1": 0, "EM": 0}
+
         no_improvement_step = 0
         for i in range(self.num_epoch, self.config.max_epochs):
             self.num_epoch = i
@@ -286,7 +317,16 @@ def evaluate(model, dataset, eval_file, config):
                 p1, p2 = model(Cwid, Ccid, Qwid, Qcid)
                 z = impossibles = None
 
-            loss = loss_func(p1, p2, y1, y2, z, impossibles, coeff=config.loss_coeff)
+            loss = loss_func(
+                p1,
+                p2,
+                y1,
+                y2,
+                z,
+                impossibles,
+                a_coeff=config.answer_loss_coeff,
+                s_coeff=config.span_loss_coeff,
+            )
             ymin, ymax = pred_func(p1, p2, z)
 
             losses.append(loss)
@@ -493,8 +533,7 @@ def main(args, config):
             )
         shutil.rmtree(f"{args.output_folder}/src", ignore_errors=True)
         shutil.copytree("src/", f"{args.output_folder}/src")
-        
-        
+
         shutil.copy(args.config_file, args.output_folder)
         train(args, config)
 
