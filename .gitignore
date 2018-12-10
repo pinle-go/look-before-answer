@@ -7,3 +7,4 @@ __pycache__
 .ipynb_checkpoints
 TODO.md
 data_V2
+out*

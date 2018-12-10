@@ -92,14 +92,11 @@ def get_raw_scores(dataset, preds):
           gold_answers = ['']
         if qid not in preds:
           print('Missing prediction for %s' % qid)
-          exact_scores[qid] =0
-          f1_scores[qid] = 0
           continue
         a_pred = preds[qid]
         # Take max over all gold answers
         exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
         f1_scores[qid] = max(compute_f1(a, a_pred) for a in gold_answers)
-  print(exact_scores, f1_scores)
   return exact_scores, f1_scores
 
 def apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
@@ -246,10 +243,10 @@ def main():
   has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
   no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
   exact_raw, f1_raw = get_raw_scores(dataset, preds)
-  #exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
-  #                                      OPTS.na_prob_thresh)
-  #f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
-  #                                   OPTS.na_prob_thresh)
+  exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
+                                        OPTS.na_prob_thresh)
+  f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
+                                     OPTS.na_prob_thresh)
   out_eval = make_eval_dict(exact_thresh, f1_thresh)
   if has_ans_qids:
     has_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=has_ans_qids)

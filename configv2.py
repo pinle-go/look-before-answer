@@ -11,12 +11,16 @@ raw_data_path = f"{home}/data/squad"
 
 glove_word_file = f"{home}/data/glove/glove.840B.300d.txt"
 glove_char_file = f"{home}/data/glove/glove.840B.300d-char.txt"
+use_plausible = True
+
 
 config = {
     "device": device,
+    "use_plausible": use_plausible,
+    "pretrained_model": "out_plausible_answering/model.pt",
     #
     "version": version,
-    "model_type": "model3",
+    "model_type": "model6",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
     "raw_dev_file": f"{raw_data_path}/dev-{version}.json",
@@ -51,7 +55,7 @@ config = {
     "batch_size": 32,
     "val_batch_size": 250,
     "learning_rate": 1e-3,
-    "max_epochs": 100,
+    "max_epochs": 10,
     "weight_decay": 3 * 1e-7,
     "lr_warm_up_num": 1e3,
     "grad_clip": 10,
@@ -60,10 +64,10 @@ config = {
     "dropout_char": 0.1,
     "dropout_word": 0.05,
     "dropout": 0.1,
-    "enc_filters": 96,
+    "enc_filters": 128,
     "attention_heads": 1,
     #
-    "answer_loss_coeff": 0.01,
+    "answer_loss_coeff": 1,
     "span_loss_coeff": 1,
     "patience": 5,
     "checkpoint": 1000,

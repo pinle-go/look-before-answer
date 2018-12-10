@@ -113,6 +113,21 @@ def loss_model_ao(p1, p2, y1, y2, z, impossible, **kwargs):
     return F.binary_cross_entropy_with_logits(z, impossible.float())
 
 
+def loss_model5(p1, p2, y1, y2, z, impossibles, **kwargs):
+    p1 = F.log_softmax(p1, dim=1)
+    p2 = F.log_softmax(p2, dim=1)
+    # TODO: should have used para limit
+    y1[y1 >= 400] = 400
+    y2[y2 >= 400] = 400
+    y1[y1 <= -1] = 400
+    y2[y2 <= -1] = 400
+
+    loss1 = F.nll_loss(p1, y1, ignore_index=400)
+    loss2 = F.nll_loss(p2, y2, ignore_index=400)
+    loss = loss1 + loss2
+    return loss
+
+
 def pred_origin(p1, p2, z):
     p1 = F.softmax(p1, dim=1)
     p2 = F.softmax(p2, dim=1)
@@ -241,10 +256,13 @@ def pred_model3(p1, p2, z):
 
 def pred_model_ao(p1, p2, z, **kwargs):
     ymin, ymax = [], []
-    # import ipdb; ipdb.set_trace()
     z = z.tolist()
-    for (z_, ) in zip(z):
+
+    ymin_, ymax_ = pred_origin(p1, p2, z)
+
+    for idx, z_ in enumerate(z):
         if z_ < 0:
+            # append something random, we only need answerability result from
             ymin.append(0)
             ymax.append(1)
         else:
@@ -266,6 +284,12 @@ def get_loss_func(model_type, version):
             return loss_model3
         elif model_type == "model_ao":
             return loss_model_ao
+        elif model_type == "model4":
+            return loss_model_ao
+        elif model_type == "model5":
+            return loss_model5
+        elif model_type == "model6":
+            return loss_model_ao
         else:
             raise ValueError()
     else:
@@ -284,6 +308,12 @@ def get_pred_func(model_type, version):
             return pred_model3
         elif model_type == "model_ao":
             return pred_model_ao
+        elif model_type == "model4":
+            return pred_model_ao
+        elif model_type == "model5":
+            return pred_origin
+        elif model_type == "model6":
+            return pred_model_ao
         else:
             raise ValueError()
     else:
@@ -291,7 +321,15 @@ def get_pred_func(model_type, version):
 
 
 def get_model_func(model_type, version):
-    from models import QANet, QANetV0, QANetV1, QANetV2, QANetAO
+    from models import (
+        QANet,
+        QANetV0,
+        QANetV1,
+        QANetV2,
+        QANetV3,
+        QANetAO,
+        QANetAO_learned,
+    )
 
     if version == "v2.0":
         if model_type == "model0":
@@ -304,6 +342,13 @@ def get_model_func(model_type, version):
             return QANetV2
         elif model_type == "model_ao":
             return QANetAO
+        elif model_type == "model4":
+            return QANetV3
+        elif model_type == "model5":
+            # this is training model for only predicting answer using 2.0 data
+            return QANetV0
+        elif model_type == "model6":
+            return QANetAO_learned
         else:
             raise ValueError()
     else:

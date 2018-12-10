@@ -107,10 +107,10 @@ class Trainer:
                 )
                 self.ema.resume(self.model)
                 self.model.train()
-                
-                if (metrics["loss"]<best_loss["loss"]):
+
+                if metrics["loss"] < best_loss["loss"]:
                     best_loss["loss"] = metrics["loss"]
-                
+
                 if metrics["f1"] > best_loss["F1"]:
                     best_loss["F1"] = metrics["f1"]
                     no_improvement_step = 0
@@ -138,9 +138,9 @@ class Trainer:
         self.ema.resume(self.model)
         self.model.train()
 
-        if (metrics["loss"]<best_loss["loss"]):
+        if metrics["loss"] < best_loss["loss"]:
             best_loss["loss"] = metrics["loss"]
-                
+
         if metrics["f1"] > best_loss["F1"]:
             best_loss["F1"] = metrics["f1"]
             no_improvement_step = 0
@@ -213,7 +213,7 @@ class Trainer:
                     f"No model improvement even after {self.config.patience} steps. Stopping!!"
                 )
                 break
-            if (i + 1) % self.config.save_every and i:
+            if (i + 1) % self.config.save_every == 0 and i:
                 self.save(self.config.model_fname)
         self.save(self.config.model_fname)
         metrics = evaluate(self.model, self.dev_data, self.dev_eval, self.config)
@@ -272,11 +272,30 @@ def train(args, config):
 
     # create model
     print("creating model")
-    Model = model_utils.get_model_func(config.model_type, config.version)
-    model = Model(word_mat, char_mat, config).to(config.device)
-    # model = torch.nn.DataParallel(model)
-    print(model)
+    if config.model_type == "model6":
+        Model = model_utils.get_model_func(config.model_type, config.version)
+        # get pretrained model from config
 
+        # takes a pretrained of QANet
+        model_dict_ = torch.load(config.pretrained_model, pickle_module=dill)["model"]
+        model_dict = {}
+        for key in model_dict_:
+            model_dict[key[7:]] = model_dict_[key]
+
+        from models import QANet
+
+        pretrained_model = QANet(word_mat, char_mat, config)
+        # load its state
+        model_data = pretrained_model.state_dict()
+        model_data.update(model_dict)
+        pretrained_model.load_state_dict(model_data)
+        model = Model(pretrained_model, config).to(config.device)
+        model = torch.nn.DataParallel(model)
+
+    else:
+        Model = model_utils.get_model_func(config.model_type, config.version)
+        model = Model(word_mat, char_mat, config).to(config.device)
+        model = torch.nn.DataParallel(model)
     print("Training Model")
     trainer = Trainer(model, train_dataset, dev_dataset, dev_eval_file, config)
     if args.model_file is not None:
