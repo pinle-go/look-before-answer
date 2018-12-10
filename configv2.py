@@ -16,10 +16,20 @@ use_plausible = True
 
 config = {
     "device": device,
+    # To use plausible data or not
+    # set to false for all except model 5 and model 6
     "use_plausible": use_plausible,
     "pretrained_model": "out_plausible_answering/model.pt",
     #
     "version": version,
+    # change the model type to run different models
+    # model0 - random
+    # model1 - QANET_NAF
+    # model2 - QANET-NA
+    # model3 - QANET-combined
+    # model4 - separate-V4 (model with three different learned attention on decoder)
+    # model5  (to generate pre-trained model) - Answering only model trained with plausible answer
+    # model6 - Answerability only model trained with plausible answers
     "model_type": "model6",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
@@ -66,7 +76,7 @@ config = {
     "dropout": 0.1,
     "enc_filters": 128,
     "attention_heads": 1,
-    #
+    # alpha and beta for model3
     "answer_loss_coeff": 1,
     "span_loss_coeff": 1,
     "patience": 5,
