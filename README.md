@@ -1,47 +1,48 @@
-# QANet
-A Pytorch implementation of [QANet](https://arxiv.org/pdf/1804.09541.pdf)  
-The code is mostly based on the two repositories:
-[hengruo/QANet-pytorch](https://github.com/hengruo/QANet-pytorch)
-[NLPLearn/QANet](https://github.com/NLPLearn/QANet)
-
-## Performance
-| Training epochs / Steps | BatchSize | HiddenSize | Attention Heads |  EM  |  F1  |
-|:-----------------------:|:---------:|:----------:|:---------------:|:----:|:----:|
-|      12.8 / 35,000     |     32    |     96     |        1        | 69.0 | 78.6 |
-|      22 / 60,000       |     32    |     96     |        1        | 69.7 | 79.2 |
-|      12.8 / 93,200     |     12    |     128    |        8        | 70.3 | 79.7 |
-|      22 / 160,160      |     12    |     128    |        8        | 70.7 | 80.0 |
-
-*The results of hidden size 128 with 8 heads were run with 12 batches.
+# Look Before you answer
+Experiments with separating SQuAD2.0 with QANet in pytorch based on [BangLiu-QANet-pytorch](https://github.com/BangLiu/QANet-PyTorch) but has been modified a lot.
 
 ## Requirements
-  * python 3.6
-  * pytorch 0.4.0
-  * tqdm
-  * spacy 2.0.11
-  * tensorboardX
-  * absl-py
+  - python 3.6
+  - pytorch 0.4.0
+  - spacy 2.0.11
+  
 
+  
 ## Usage
 Download and preprocess the data
 ```bash
 # download SQuAD and Glove
 $ sh download.sh
 # preprocess
-$ python3.6 main.py --mode data
+$ python3 main.py --mode preprocess -c <config file>
+
 ```
+For SqUAD2.0 experiments use `configv2.py`. See configV2 for possible options. Some options can be modified from args. Run `python3 main.py --help` to see the options
+
+
 
 Train the model
 ```bash
 # model/model.pt will be generated every epoch
-$ python3.6 main.py --mode train
+$ python3 main.py --mode train  -c <config> -o <output folder>
 ```
-## Tensorboard
+
+Test the model
 ```bash
-# Run tensorboard for visualisation
-$ tensorboard --logdir ./log/
+# model/model.pt will be generated every epoch
+$ python3 main.py --mode test  -c <config> -o <output folder> --model_file <model.pt file>
 ```
-## TODO
-- [X] Add Exponential Moving Average
-- [X] Reach the performance of the paper with hidden size 96, 1 head.
-- [X] Test on hidden size 128, 8 head.
+
+
+
+### Model types
+
+Change the model type to run different models (see `configv2.py`)
+
+- model0 - random
+- model1 - QANET_NAF
+- model2 - QANET-NA
+- model3 - QANET-combined
+- model4 - separate-V4 (model with three different learned attention on decoder)
+- model5  (to generate pre-trained model) - Answering only model trained with plausible answer
+- model6 - Answerability only model trained with plausible answers
