@@ -11,12 +11,16 @@ raw_data_path = f"{home}/data/squad"
 
 glove_word_file = f"{home}/data/glove/glove.840B.300d.txt"
 glove_char_file = f"{home}/data/glove/glove.840B.300d-char.txt"
+use_plausible = True
+
 
 config = {
     "device": device,
+    "use_plausible": use_plausible,
+    "pretrained_model": "out_plausible_answering/model.pt",
     #
     "version": version,
-    "model_type": "model4",
+    "model_type": "model6",
     #
     "raw_train_file": f"{raw_data_path}/train-{version}.json",
     "raw_dev_file": f"{raw_data_path}/dev-{version}.json",

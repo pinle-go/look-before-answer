@@ -4,6 +4,7 @@ from collections import Counter
 
 from sklearn.metrics import f1_score as skf1
 
+
 def evaluate(eval_file, answer_dict, version):
     if version == "v2.0":
         f1 = exact_match = total = correct_answerable = 0
@@ -20,7 +21,6 @@ def evaluate(eval_file, answer_dict, version):
 
             z_true.append(1 if is_answerable else 0)
             z_pred.append(1 if prediction == "" else 0)
-            
 
             exact_match += metric_max_over_ground_truths(
                 exact_match_score, prediction, ground_truths
@@ -33,7 +33,7 @@ def evaluate(eval_file, answer_dict, version):
             "exact_match": exact_match,
             "f1": f1,
             "answerability_acc": answerability_acc,
-            "answerability_f1": skf1(z_true, z_pred)
+            "answerability_f1": skf1(z_true, z_pred),
         }
     else:
         f1 = exact_match = total = 0

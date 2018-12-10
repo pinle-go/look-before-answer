@@ -126,7 +126,6 @@ def process_file(filename, data_type, word_counter, char_counter, version="v2.0"
                             "is_impossible": is_impossible,
                         }
                         examples.append(example)
-                        # note eval files are now indexed by uuid here
 
                         eval_examples[str(total)] = {
                             "context": context,
@@ -347,10 +346,11 @@ def build_features(
             for j, char in enumerate(token[:char_limit]):
                 ques_char_idx[i, j] = _get_char(char)
 
-        # TODO: add plausible answers and use them may be
         if version == "v2.0":
             if not example["is_impossible"]:
                 starts, ends = example["y1s"], example["y2s"]
+            elif config.use_plausible is True and len(example["plausible_y1s"]) > 0:
+                starts, ends = example["plausible_y1s"], example["plausible_y2s"]
             else:
                 starts, ends = [-1], [-1]
 
